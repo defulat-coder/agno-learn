@@ -272,7 +272,8 @@ flowchart TD
 - **`_messages.py` 很大（~93KB，1300+ 行）**：必须分段读取，用 offset/limit 参数
 - **源码只读一次**：agno 核心源码（agent.py、_messages.py、_response.py、responses.py、run/base.py、run/agent.py、_managers.py）在同一会话中只需读取一次，后续目录直接复用
 - **`memory/manager.py` 很大（~70KB）**：必须用 offset/limit 分段读取，建议分 3 段：L1-200（类定义 + 基础方法）、L400-560（update_memory_task/agentic 流程）、L958-990（get_system_message）
-- **`_messages.py` 需要读取 3 个区间**：L56-98（format_message_with_state_variables）、L106-440（get_system_message 含所有步骤）、L1146-1345（get_run_messages）。session/state 类文件经常用到 L260-440 的后半段步骤，不要遗漏
+- **`_messages.py` 需要读取 3-5 个区间**：L56-98（format_message_with_state_variables）、L106-440（get_system_message 含所有步骤）、L1146-1345（get_run_messages）。session/state 类文件经常用到 L260-440 的后半段步骤，不要遗漏。knowledge 类文件还需 L905-954（Traditional RAG 注入）和 L1665-1761（get_relevant_docs_from_knowledge）
+- **`knowledge/knowledge.py` 很大（~3400 行）**：必须用 offset/limit 分段读取，关键区间：L41-55（类定义）、L507-546（search）、L2879-2933（build_context + 指令模板）、L3303-3324（retrieve）
 
 ### 单文件模式
 
@@ -282,6 +283,12 @@ flowchart TD
    - `agno/agent/_messages.py`（L106-260，`get_system_message()`）
    - `agno/agent/_messages.py`（L1146-1345，`get_run_messages()`）
    - 如涉及工具：`agno/agent/_tools.py`（L105-195，`get_tools()`）
+   - 如涉及 Knowledge/知识库：`agno/knowledge/knowledge.py`（L41-55 类定义 + L507-546 search + L2879-2933 build_context + L3303-3324 retrieve）
+   - 如涉及 search_knowledge 或 knowledge_retriever：`agno/agent/_default_tools.py`（L103-282，create_knowledge_search_tool）
+   - 如涉及 add_knowledge_to_context（Traditional RAG）：`agno/agent/_messages.py`（L905-954，get_user_message 中的预检索注入）
+   - 如涉及 knowledge_retriever：`agno/agent/_messages.py`（L1665-1761，get_relevant_docs_from_knowledge）
+   - 如涉及 knowledge_filters/enable_agentic_knowledge_filters：`agno/filters.py`（L46-106）+ `agno/utils/knowledge.py`（全文）
+   - 如涉及 ReasoningTools：`agno/tools/reasoning.py`（全文，~291 行）
    - 如涉及 callable factory（tools/knowledge/members 为函数）：`agno/utils/callables.py`（全文，~613 行）
    - 如涉及 Toolkit 类：`agno/tools/toolkit.py`（L10-80）
    - 如涉及 Literal 类型参数：`agno/utils/json_schema.py`（L124-143）
@@ -315,6 +322,11 @@ flowchart TD
    - 基础（必读）：agent.py（L67-350）、_messages.py（L106-260 + L1146-1345）
    - 按需追加（根据步骤 4 的扫描结果）：
      - 有工具 → `_tools.py`（L105-195 + L350-477）
+     - 有 Knowledge/知识库 → `knowledge/knowledge.py`（L41-55 + L507-546 + L2879-2933 + L3303-3324）
+     - 有 search_knowledge / knowledge_retriever → `_default_tools.py`（L103-282）+ `_messages.py` L1665-1761
+     - 有 add_knowledge_to_context → `_messages.py` L905-954
+     - 有 knowledge_filters / enable_agentic_knowledge_filters → `filters.py` L46-106 + `utils/knowledge.py`（全文）
+     - 有 ReasoningTools → `tools/reasoning.py`（全文）
      - 有 callable factory → `utils/callables.py`（全文）
      - 有 Toolkit 子类 → `tools/toolkit.py`（L10-80）
      - 有 Literal 参数 → `utils/json_schema.py`（L124-143）
@@ -386,6 +398,9 @@ Team.print_response()
 | `enable_session_summaries` | L97 | 启用自动摘要 |
 | `add_session_summary_to_context` | L99 | 摘要注入 system prompt |
 | `session_summary_manager` | L101 | 自定义摘要管理器 |
+| `search_knowledge` | L195 | 启用 Agentic RAG 搜索工具（默认 `True`） |
+| `add_search_knowledge_instructions` | L197 | 是否向 system prompt 注入搜索指令（默认 `True`） |
+| `update_knowledge` | L199 | 启用知识库更新工具 |
 | `tools` | L159 | 工具列表（List 或 Callable 工厂） |
 | `tool_call_limit` | L162 | 工具调用次数限制 |
 | `tool_choice` | L169 | 工具选择策略（none/auto/指定函数） |
@@ -418,6 +433,12 @@ Team.print_response()
 | `num_history_runs` | L129 | 限制历史运行次数 |
 | `num_history_messages` | L131 | 限制历史消息数量 |
 | `max_tool_calls_from_history` | L133 | 历史工具调用限制 |
+| `knowledge` | L136 | Knowledge 实例（或 Callable 工厂） |
+| `knowledge_filters` | L139 | 静态过滤器（Dict 或 List[FilterExpr]） |
+| `enable_agentic_knowledge_filters` | L141 | 让模型动态选择过滤条件 |
+| `add_knowledge_to_context` | L142 | Traditional RAG：预注入上下文到用户消息 |
+| `knowledge_retriever` | L148 | 自定义检索函数（替代 Knowledge.search） |
+| `references_format` | L149 | 引用格式（`Literal["json", "yaml"]`，默认 `"json"`） |
 | `memory_manager` | L111 | MemoryManager 实例 |
 | `enable_agentic_memory` | L113 | 启用代理式记忆（注册 update_user_memory 工具） |
 | `update_memory_on_run` | L115 | 每次运行后自动提取记忆 |
@@ -502,6 +523,9 @@ Team.print_response()
 
 | 函数 | 行号 | 说明 |
 |------|------|------|
+| Traditional RAG 预检索注入 | L905-954 | `add_knowledge_to_context=True` 时预检索并注入 `<references>` 到用户消息 |
+| `get_relevant_docs_from_knowledge()` | L1665 | 同步检索文档（knowledge_retriever 优先 → Knowledge.retrieve 回退） |
+| `aget_relevant_docs_from_knowledge()` | L1764 | 异步版 |
 | `get_messages_for_parser_model()` | L1591 | 构造 parser_model 的消息 |
 | `get_messages_for_parser_model_stream()` | L1616 | 流式版 |
 | `get_messages_for_output_model()` | L1641 | 构造 output_model 的消息 |
@@ -511,6 +535,7 @@ Team.print_response()
 | 工具类 | 文件 | 行号 |
 |--------|------|------|
 | `_tools.get_tools()` | `agent/_tools.py` | L105 |
+| 注册 knowledge 搜索工具 | `agent/_tools.py` | L176-186 |
 | 注册 enable_agentic_memory 工具 | `agent/_tools.py` | L150-151 |
 | 注册 LearningMachine 工具 | `agent/_tools.py` | L154-160 |
 | `_tools.parse_tools()` | `agent/_tools.py` | L350-431 |
@@ -524,6 +549,10 @@ Team.print_response()
 | `WebSearchTools.web_search()` | `tools/websearch.py` | L74 |
 | `HackerNewsTools` | `tools/hackernews.py` | 顶部 |
 | `YFinanceTools` | `tools/yfinance.py` | 顶部 |
+| `ReasoningTools` | `tools/reasoning.py` | L10 |
+| `ReasoningTools.think()` | `tools/reasoning.py` | L51 |
+| `ReasoningTools.analyze()` | `tools/reasoning.py` | L117 |
+| `ReasoningTools.DEFAULT_INSTRUCTIONS` | `tools/reasoning.py` | L193 |
 
 ### Callable Factory 速查（utils/callables.py）
 
@@ -606,10 +635,75 @@ Team.print_response()
 |------|------|------|
 | `get_update_user_memory_function()` | L38 | 代理式记忆工具工厂（enable_agentic_memory 用） |
 | `update_user_memory()` | L39 | 调用 MemoryManager.update_memory_task() |
+| `create_knowledge_search_tool()` | L103 | 创建 search_knowledge_base 工具（统一入口） |
+| `_format_results()` | L118 | 按 references_format（json/yaml）序列化文档 |
+| `_track_references()` | L130 | 记录检索引用到 run_response |
+| `_resolve_filters()` | L141 | 合并代理式过滤器和用户过滤器 |
+| `search_knowledge_base_with_filters()` | L156 | 带过滤器的搜索工具（enable_agentic_knowledge_filters 用） |
+| `search_knowledge_base()` | L224 | 无过滤器的搜索工具（默认） |
 | `update_session_state_tool()` | L347 | 内置状态更新工具实现（逐 key 合并） |
 | `make_update_session_state_entrypoint()` | L366 | 绑定 agent 的闭包工厂 |
 | `get_previous_sessions_messages_function()` | L411 | 跨会话搜索工具工厂 |
 | `get_previous_session_messages()` | L425 | 搜索工具实际实现（按 user_id 过滤） |
+
+### Knowledge 速查（knowledge/knowledge.py）
+
+> Knowledge 类是知识库的核心抽象，封装向量数据库的插入、搜索和上下文构建。
+
+| 函数/类 | 行号 | 说明 |
+|---------|------|------|
+| `Knowledge` | L41 | 知识库 dataclass（继承 RemoteKnowledge） |
+| `vector_db` | L46 | 向量数据库实例 |
+| `max_results` | L48 | 默认返回文档数（10） |
+| `insert()` | L90 | 同步插入内容（path/url/text_content） |
+| `ainsert_many()` | 搜索 | 异步批量插入 |
+| `search()` | L507 | 向量搜索入口（代理到 vector_db.search） |
+| `retrieve()` | L3303 | 检索接口（代理到 search，用于 add_knowledge_to_context） |
+| `build_context()` | L2908 | 构建 system prompt 中的搜索指令（步骤 3.3.13 调用） |
+| `_SEARCH_KNOWLEDGE_INSTRUCTIONS` | L2879 | 搜索指令常量文本 |
+| `_AGENTIC_FILTER_INSTRUCTION_TEMPLATE` | L2885 | 代理式过滤器指令模板 |
+| `_get_agentic_filter_instructions()` | L2903 | 生成过滤器使用指令（含示例） |
+| `get_valid_filters()` | 搜索 | 获取向量数据库合法过滤键集合 |
+
+**Knowledge.build_context() 输出结构：**
+
+```
+<knowledge_base>
+搜索指令（_SEARCH_KNOWLEDGE_INSTRUCTIONS）
+[如 enable_agentic_filters] 过滤器指令（_AGENTIC_FILTER_INSTRUCTION_TEMPLATE）
+</knowledge_base>
+```
+
+### 知识库检索速查（_messages.py）
+
+| 函数 | 行号 | 说明 |
+|------|------|------|
+| `_get_resolved_knowledge()` | L44 | 获取解析后的 Knowledge（优先 run_context） |
+| `get_relevant_docs_from_knowledge()` | L1665 | 同步检索文档（knowledge_retriever 优先 → Knowledge.retrieve 回退） |
+| `aget_relevant_docs_from_knowledge()` | L1764 | 异步版 |
+| Traditional RAG 注入（get_user_message 内） | L905-954 | `add_knowledge_to_context=True` 时预检索并注入 `<references>` |
+
+**knowledge_retriever 参数注入映射（L1716-1732）：**
+
+| 检索函数参数名 | 注入内容 | 说明 |
+|---------------|---------|------|
+| `query` | 搜索查询字符串 | 必需（始终传入） |
+| `num_documents` | 文档数量限制 | 始终传入 |
+| `agent` | Agent 实例 | 按签名注入 |
+| `filters` | 知识过滤器 | 按签名注入 |
+| `run_context` | RunContext 对象 | 按签名注入 |
+| `dependencies` | 依赖字典（向后兼容） | 当无 `run_context` 参数时 |
+
+### 过滤器速查（filters.py + utils/knowledge.py）
+
+| 类/函数 | 文件 | 行号 | 说明 |
+|---------|------|------|------|
+| `FilterExpr` | `filters.py` | L46 | 过滤表达式基类（支持 `|` `&` `~` 运算符） |
+| `EQ` | `filters.py` | L86 | 等值过滤器 `EQ("key", "value")` |
+| `IN` | `filters.py` | L109 | 包含过滤器 |
+| `GT` / `LT` | `filters.py` | 搜索 | 大于/小于过滤器 |
+| `AND` / `OR` / `NOT` | `filters.py` | 搜索 | 逻辑组合过滤器 |
+| `get_agentic_or_user_search_filters()` | `utils/knowledge.py` | L7 | 过滤器优先级（用户 > 代理） |
 
 ### LearningMachine 速查（learn/machine.py）
 
@@ -735,6 +829,12 @@ Team.print_response()
 - 如果速查表行号与实际不符，用 `Grep "def get_system_message"` 等快速重新定位
 - **同一会话内**，agno 源码只需读取一次，后续目录生成时直接复用已有知识
 - **按特性决定额外源码**：扫描目标 `.py` 文件后，根据以下特征决定需要读取的额外源码：
+  - `knowledge` / `Knowledge` → 读 `knowledge/knowledge.py`（L41-55 类定义 + L507-546 search + L2879-2933 build_context + L3303-3324 retrieve）
+  - `search_knowledge` / `add_knowledge_to_context` → 读 `_default_tools.py` L103-282（create_knowledge_search_tool）+ `_messages.py` L905-954（Traditional RAG 注入）
+  - `knowledge_retriever` → 读 `_messages.py` L1665-1761（get_relevant_docs_from_knowledge，含 retriever 优先路径 L1716-1732）
+  - `knowledge_filters` / `enable_agentic_knowledge_filters` → 读 `filters.py` L46-106（FilterExpr/EQ）+ `utils/knowledge.py`（全文）+ `_default_tools.py` L103-282
+  - `references_format` → 已包含在 `_default_tools.py` L118-128（`_format_results`）
+  - `ReasoningTools` → 读 `tools/reasoning.py`（全文，~291 行）
   - `tools=<callable>` → 读 `utils/callables.py`
   - `Toolkit` 子类 → 读 `tools/toolkit.py`
   - `Literal[...]` 参数 → 读 `utils/json_schema.py`
@@ -806,6 +906,22 @@ Team.print_response()
 - **System Prompt 组装**：特别关注步骤 3.3.9（记忆注入 + `<updating_user_memories>` 工具说明）和步骤 3.3.12（学习上下文注入 `_learning.build_context()`）
 - **完整 API 请求**：如涉及 MemoryManager 的独立模型调用（如 `update_memory_task` 触发 gpt-5-mini），展示主模型请求和 MemoryManager 内部请求两个
 - **Mermaid 流程图**：展示工具调用触发 MemoryManager/LearningMachine 的内部流程，用 subgraph 分组
+
+### Knowledge/RAG 文件
+
+当文件涉及 `Knowledge`、`search_knowledge`、`add_knowledge_to_context`、`knowledge_retriever`、`knowledge_filters` 等知识库机制时：
+- **核心配置一览**：重点标注 `knowledge`（向量数据库类型）、`search_knowledge`（Agentic RAG）、`add_knowledge_to_context`（Traditional RAG）、`knowledge_filters`（静态过滤）、`enable_agentic_knowledge_filters`（代理式过滤）、`knowledge_retriever`（自定义检索）、`references_format`（引用格式）
+- **架构分层**：展示 Knowledge → VectorDb → Embedder/Reranker 的层次关系，Reranker 对 Agent 层透明
+- **核心组件解析**：
+  - 区分两种 RAG 模式：Agentic RAG（`search_knowledge=True`，工具调用）vs Traditional RAG（`add_knowledge_to_context=True`，预注入用户消息）
+  - 如有 Reranker，解释两阶段检索（初始检索 → 重排序）
+  - 如有 `knowledge_retriever`，解释优先级和参数注入机制
+  - 如有过滤器，解释静态 vs 代理式的区别和优先级
+- **System Prompt 组装**：关注步骤 3.3.13（`Knowledge.build_context()` 注入搜索指令），如 `enable_agentic_knowledge_filters=True` 会额外注入过滤器使用指令
+- **完整 API 请求**：
+  - Agentic RAG：展示多轮请求（工具调用 + 工具结果），注意 `search_knowledge_base` 的工具签名（有无 `filters` 参数取决于 `enable_agentic_knowledge_filters`）
+  - Traditional RAG：展示单轮请求，用户消息末尾包含 `<references>` 标签
+- **对比表**：如同一文件展示多种 RAG 策略（如 knowledge_filters.py 的 static vs agentic），用对比表格突出差异
 
 ### 异步文件
 
