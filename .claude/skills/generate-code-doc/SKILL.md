@@ -137,9 +137,18 @@ ASCII 文本图，展示用户代码层 → agno.agent 层 → 模型层的数�
 | 3.3.3 | instructions 拼接 | ... | 是/否 |
 | 3.3.4 | additional_information | ... | 是/否 |
 | 3.3.5 | `_tool_instructions` | ... | 是/否 |
+| fmt | `resolve_in_context` 变量替换 | ... | 是/否 |
 | 3.3.7 | `expected_output` | ... | 是/否 |
 | 3.3.8 | `additional_context` | ... | 是/否 |
 | 3.3.9 | `add_memories_to_context` | ... | 是/否 |
+| 3.3.10 | `add_culture_to_context` | ... | 是/否 |
+| 3.3.11 | `add_session_summary_to_context` | ... | 是/否 |
+| 3.3.12 | `add_learnings_to_context` | ... | 是/否 |
+| 3.3.13 | `search_knowledge` instructions | ... | 是/否 |
+| 3.3.14 | 模型 system message | ... | 是/否 |
+| 3.3.15 | JSON output prompt | ... | 是/否 |
+| 3.3.16 | response model format prompt | ... | 是/否 |
+| 3.3.17 | `add_session_state_to_context` | ... | 是/否 |
 
 ### 最终 System Prompt
 
@@ -261,7 +270,8 @@ flowchart TD
 - **速查表优先**：先查「源码关键位置速查表」定位行号，仅在速查表不够时才 Grep
 - **分批写入**：每批并行 Write 3 个 `.md` 文件（平衡效率和稳定性）
 - **`_messages.py` 很大（~93KB，1300+ 行）**：必须分段读取，用 offset/limit 参数
-- **源码只读一次**：agno 核心源码（agent.py、_messages.py、_response.py、responses.py）在同一会话中只需读取一次，后续目录直接复用
+- **源码只读一次**：agno 核心源码（agent.py、_messages.py、_response.py、responses.py、run/base.py、run/agent.py）在同一会话中只需读取一次，后续目录直接复用
+- **`_messages.py` 需要读取 3 个区间**：L56-98（format_message_with_state_variables）、L106-440（get_system_message 含所有步骤）、L1146-1345（get_run_messages）。session/state 类文件经常用到 L260-440 的后半段步骤，不要遗漏
 
 ### 单文件模式
 
@@ -277,6 +287,13 @@ flowchart TD
    - 如涉及 Team：`agno/team/team.py`
    - 如涉及特定模型：对应模型文件
    - 如涉及 output_model/parser_model：`agno/agent/_response.py`
+   - 如涉及 session_state 模板变量/resolve_in_context：`agno/agent/_messages.py`（L56-98，`format_message_with_state_variables`）
+   - 如涉及 enable_agentic_state：`agno/agent/_default_tools.py`（L347-380）
+   - 如涉及 tool_hooks：`agno/tools/function.py`（L898-974，`_build_hook_args` + `_build_nested_execution_chain`）
+   - 如涉及 search_session_history：`agno/agent/_default_tools.py`（L411-480）
+   - 如涉及 enable_session_summaries：`agno/session/summary.py`（L22-106）
+   - 如涉及 stream_events/RunCompletedEvent：`agno/run/agent.py`（L134-278）
+   - 如涉及 RunContext（工具函数参数）：`agno/run/base.py`（L16-33）
 2. **定位核心 Agno 特性**：识别 Agent 构造参数中的关键机制
 3. **补充追踪**：仅对速查表未覆盖的特性进行 Grep
 4. **组装文档**：按模板结构依次生成各章节
@@ -299,6 +316,13 @@ flowchart TD
      - 有 Literal 参数 → `utils/json_schema.py`（L124-143）
      - 有 Team → `team/team.py`
      - 有 tool_call_limit/tool_choice → `_run.py`（L490-510）
+     - 有 session_state 模板变量 → `_messages.py`（L56-98）
+     - 有 enable_agentic_state → `_tools.py`（L165-171）+ `_default_tools.py`（L347-380）
+     - 有 tool_hooks → `tools/function.py`（L898-974）
+     - 有 search_session_history → `_tools.py`（L143-148）+ `_default_tools.py`（L411-480）
+     - 有 enable_session_summaries → `session/summary.py`（L22-106）
+     - 有 stream_events / RunCompletedEvent → `run/agent.py`（L134-278）
+     - 有 RunContext 用法 → `run/base.py`（L16-33）
 6. **补充 Grep**：对速查表未覆盖的新特性进行针对性 Grep
 7. **TaskCreate**：为每个待生成的文件创建 task，便于跟踪进度和断点续做
 8. **分批 Write**：每批 3 个文件并行写入，完成后更新 task 状态，直至全部完成
@@ -347,6 +371,14 @@ Team.print_response()
 | `model` | L70 | 模型实例 |
 | `name` | L72 | Agent 名称 |
 | `session_state` | L84 | 默认 session state 字典 |
+| `add_session_state_to_context` | L86 | 将 session_state 注入 system prompt |
+| `enable_agentic_state` | L88 | 启用内置 update_session_state 工具 |
+| `overwrite_db_session_state` | L90 | 是否覆盖（默认合并）DB 中的状态 |
+| `search_session_history` | L94 | 启用跨会话搜索工具 |
+| `num_history_sessions` | L95 | 搜索会话数限制 |
+| `enable_session_summaries` | L97 | 启用自动摘要 |
+| `add_session_summary_to_context` | L99 | 摘要注入 system prompt |
+| `session_summary_manager` | L101 | 自定义摘要管理器 |
 | `tools` | L159 | 工具列表（List 或 Callable 工厂） |
 | `tool_call_limit` | L162 | 工具调用次数限制 |
 | `tool_choice` | L169 | 工具选择策略（none/auto/指定函数） |
@@ -376,8 +408,18 @@ Team.print_response()
 | `introduction` | L221 | 初始问候消息 |
 | `system_message_role` | L219 | system 消息角色 |
 | `add_history_to_context` | L127 | 历史消息开关 |
+| `num_history_runs` | L129 | 限制历史运行次数 |
+| `num_history_messages` | L131 | 限制历史消息数量 |
 | `max_tool_calls_from_history` | L133 | 历史工具调用限制 |
 | `db` | L123 | 数据库配置 |
+| `resolve_in_context` | L249 | 启用 session_state/dependencies 模板变量替换（默认 True） |
+| `store_history_messages` | L213 | 控制是否存储历史消息（默认 False=线性增长） |
+| `stream` | L302 | 流式响应 |
+| `stream_events` | L304 | 流式事件模式 |
+| `get_session_state()` | L939 | 获取当前 session_state |
+| `update_session_state()` | L945 | 手动更新 session_state |
+| `get_chat_history()` | L1005 | 获取聊天历史 |
+| `get_session_summary()` | L1013 | 获取会话摘要 |
 | `print_response()` | L1053 | 用户调用入口 |
 
 ### get_system_message() 步骤索引（_messages.py）
@@ -401,6 +443,19 @@ Team.print_response()
 | 3.3.7 expected_output | L271-272 | 期望输出 |
 | 3.3.8 additional_context | L274-275 | 额外上下文 |
 | 3.3.9 memories | L282-320 | 用户记忆 |
+| 3.3.10 cultural knowledge | L322-381 | 文化知识 |
+| 3.3.11 session summary | L384-392 | 会话摘要（`add_session_summary_to_context`） |
+| 3.3.12 learnings | L395-402 | 学习上下文 |
+| 3.3.13 search_knowledge instructions | L404-413 | 知识库搜索指令 |
+| 3.3.14 model system message | L416-418 | 模型级 system message |
+| 3.3.15 JSON output prompt | L420-430 | JSON 格式化 prompt |
+| 3.3.16 parser_model format | L433-434 | parser_model 格式 prompt |
+| 3.3.17 session_state to context | L437-438 | `add_session_state_to_context` XML 注入 |
+| fmt `format_message_with_state_variables` | L262-268 | 在 3.3.5 后、3.3.7 前执行变量替换 |
+
+### format_message_with_state_variables()（_messages.py L56）
+
+将 instructions/system_message 中的 `{var}` 模板变量替换为 `session_state`、`dependencies`、`metadata`、`user_id` 中的值。使用 `string.Template.safe_substitute()`，未匹配的变量保持原样。受 `resolve_in_context`（默认 True）控制。
 
 ### get_run_messages() 步骤索引（_messages.py）
 
@@ -513,10 +568,75 @@ Team.print_response()
 | `members` | `team/team.py` | 成员列表或工厂函数 |
 | `cache_callables` | `team/team.py` | 控制是否缓存工厂结果 |
 
+### RunContext 速查（run/base.py）
+
+| 类/字段 | 行号 | 说明 |
+|---------|------|------|
+| `RunContext` | L16 | 运行上下文 dataclass |
+| `run_id` | L17 | 运行 ID |
+| `session_id` | L18 | 会话 ID |
+| `user_id` | L19 | 用户 ID |
+| `session_state` | L27 | 会话状态字典（引用传递，工具函数可直接修改） |
+
+### 事件类型速查（run/agent.py）
+
+| 类 | 行号 | 说明 |
+|----|------|------|
+| `RunEvent` | L134 | 事件类型枚举 |
+| `RunCompletedEvent` | L261 | 运行完成事件，含 session_state, metrics, content |
+
+### Default Tools 速查（agent/_default_tools.py）
+
+| 函数 | 行号 | 说明 |
+|------|------|------|
+| `update_session_state_tool()` | L347 | 内置状态更新工具实现（逐 key 合并） |
+| `make_update_session_state_entrypoint()` | L366 | 绑定 agent 的闭包工厂 |
+| `get_previous_sessions_messages_function()` | L411 | 跨会话搜索工具工厂 |
+| `get_previous_session_messages()` | L425 | 搜索工具实际实现（按 user_id 过滤） |
+
+### tool_hooks 执行链速查（tools/function.py）
+
+| 函数 | 行号 | 说明 |
+|------|------|------|
+| `Function.tool_hooks` | L168 | hook 列表属性 |
+| `_build_hook_args()` | L898 | hook 参数注入（检查签名自动注入 agent/run_context/arguments 等） |
+| `_build_nested_execution_chain()` | L928 | 构建嵌套调用链（reduce 包裹 hooks） |
+| 有 hook 时执行 | L1007-1009 | 执行链式调用，hook 可拦截并返回结果 |
+
+**tool_hooks 参数注入映射（_build_hook_args L904-926）：**
+
+| hook 函数参数名 | 注入内容 | 说明 |
+|----------------|---------|------|
+| `agent` | `self.function._agent` | Agent 实例 |
+| `team` | `self.function._team` | Team 实例 |
+| `run_context` | `self.function._run_context` | RunContext（含 session_state） |
+| `name` / `function_name` | 工具函数名 | |
+| `function` / `func` / `function_call` | next_func 回调 | 调用以继续链 |
+| `args` / `arguments` | 工具调用参数 | 模型传入的参数 |
+
+### Session Summary 速查（session/summary.py）
+
+| 类/函数 | 行号 | 说明 |
+|---------|------|------|
+| `SessionSummary` | L22 | 摘要 dataclass（summary, topics, updated_at） |
+| `SessionSummaryResponse` | L45 | 结构化输出 Pydantic 模型 |
+| `SessionSummaryManager` | L62 | 摘要管理器（model, session_summary_prompt） |
+| `get_system_message()` | L92 | 构建摘要生成的 system prompt |
+
+### 数据库速查
+
+| 类 | 文件 | 说明 |
+|----|------|------|
+| `SqliteDb` | `db/sqlite/` | SQLite 同步后端 |
+| `AsyncSqliteDb` | `db/sqlite/` | SQLite 异步后端 |
+| `PostgresDb` | `db/postgres/` | PostgreSQL 后端 |
+| `InMemoryDb` | `db/in_memory/in_memory_db.py:27` | 内存数据库（不持久化） |
+
 ### 其他速查
 
 | 函数/类 | 文件 | 行号 | 说明 |
 |---------|------|------|------|
+| `format_message_with_state_variables()` | `agent/_messages.py` | L56 | 模板变量替换（session_state/dependencies） |
 | `execute_instructions()` | `utils/agent.py` | L949 | 执行 callable instructions |
 | `filter_tool_calls()` | `utils/message.py` | L10 | 过滤历史工具调用 |
 | `save_run_response_to_file()` | `agent/_run.py` | L4295 | 保存响应到文件 |
@@ -536,6 +656,19 @@ Team.print_response()
   - `Literal[...]` 参数 → 读 `utils/json_schema.py`
   - `Team(members=...)` → 读 `team/team.py` + `utils/callables.py`
   - `tool_call_limit` / `tool_choice` → 读 `_run.py` 对应行
+  - `session_state` / `resolve_in_context` → 读 `_messages.py` L56-98（`format_message_with_state_variables`）
+  - `add_session_state_to_context` → 读 `_messages.py` L437-438
+  - `enable_agentic_state` → 读 `_tools.py` L165-171 + `_default_tools.py` L347-380
+  - `tool_hooks` → 读 `tools/function.py` L898-974（`_build_hook_args` + `_build_nested_execution_chain`）
+  - `search_session_history` → 读 `_tools.py` L143-148 + `_default_tools.py` L411-480
+  - `enable_session_summaries` → 读 `session/summary.py` L22-106 + `_run.py` L589
+  - `add_history_to_context` → `_messages.py` L1231-1262（已包含在基础读取范围）
+  - `store_history_messages` → `agent.py` L213（已包含在基础读取范围）
+  - `stream_events` / `RunCompletedEvent` → 读 `run/agent.py` L134-278
+  - `get_session_state` / `update_session_state` → 读 `agent.py` L939-953
+  - `get_chat_history` → 读 `agent.py` L1005-1011
+  - `AsyncSqliteDb` / 异步模式 → 确认使用 `aprint_response` / `asyncio.run`
+  - `InMemoryDb` → 读 `db/in_memory/in_memory_db.py` L27
 - **用 TaskCreate 跟踪批量进度**：批量模式下为每个文件创建 task，完成后标记 completed，便于断点续做
 - **`utils/callables.py` 较小（~613 行）**：可一次性全文读取，无需分段
 
@@ -568,6 +701,21 @@ Team.print_response()
 - **System Prompt 组装**：注明是 Team 协调层的 prompt，各成员 Agent 有各自独立的 prompt
 - **完整 API 请求**：展示 Team 协调层的请求（含 transfer_to_X 工具）和代表性成员 Agent 的请求
 - **核心调用链**：使用 Team 的调用链而非 Agent 的
+
+### Session/State 文件
+
+当文件涉及 session_state、历史消息、会话持久化等机制时：
+- **核心配置一览**：重点标注 `session_state`、`add_session_state_to_context`、`enable_agentic_state`、`add_history_to_context`、`store_history_messages`、`search_session_history`、`enable_session_summaries` 等开关
+- **核心组件解析**：解释状态的生命周期（初始化 → RunContext 传递 → 工具函数修改 → 持久化）
+- **System Prompt 组装**：特别关注 `{var}` 模板变量替换（步骤 fmt）和 `<session_state>` XML 注入（步骤 3.3.17）
+- **对比表**：如果该文件的机制与其他文件有对比意义（如 `enable_agentic_state` vs 自定义工具），用表格对比
+
+### 异步文件
+
+当文件使用 `aprint_response`、`AsyncSqliteDb`、`asyncio.run` 等异步模式时：
+- 在架构分层中标注 `(async)`
+- 在 API 请求中使用相同格式（异步只影响 agno 层，不影响 API 请求格式）
+- 在 Mermaid 流程图中不需要特别区分同步/异步
 
 ## 注意事项
 
