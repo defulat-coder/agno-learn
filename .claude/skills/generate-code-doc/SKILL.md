@@ -270,7 +270,8 @@ flowchart TD
 - **速查表优先**：先查「源码关键位置速查表」定位行号，仅在速查表不够时才 Grep
 - **分批写入**：每批并行 Write 3 个 `.md` 文件（平衡效率和稳定性）
 - **`_messages.py` 很大（~93KB，1300+ 行）**：必须分段读取，用 offset/limit 参数
-- **源码只读一次**：agno 核心源码（agent.py、_messages.py、_response.py、responses.py、run/base.py、run/agent.py）在同一会话中只需读取一次，后续目录直接复用
+- **源码只读一次**：agno 核心源码（agent.py、_messages.py、_response.py、responses.py、run/base.py、run/agent.py、_managers.py）在同一会话中只需读取一次，后续目录直接复用
+- **`memory/manager.py` 很大（~70KB）**：必须用 offset/limit 分段读取，建议分 3 段：L1-200（类定义 + 基础方法）、L400-560（update_memory_task/agentic 流程）、L958-990（get_system_message）
 - **`_messages.py` 需要读取 3 个区间**：L56-98（format_message_with_state_variables）、L106-440（get_system_message 含所有步骤）、L1146-1345（get_run_messages）。session/state 类文件经常用到 L260-440 的后半段步骤，不要遗漏
 
 ### 单文件模式
@@ -294,6 +295,9 @@ flowchart TD
    - 如涉及 enable_session_summaries：`agno/session/summary.py`（L22-106）
    - 如涉及 stream_events/RunCompletedEvent：`agno/run/agent.py`（L134-278）
    - 如涉及 RunContext（工具函数参数）：`agno/run/base.py`（L16-33）
+   - 如涉及 LearningMachine/learning：`agno/learn/machine.py`（L53-120 类定义 + L350-465 build_context/get_tools + L498-540 process）、`agno/learn/config.py`（全文，~464 行）
+   - 如涉及 enable_agentic_memory/memory_manager/MemoryManager：`agno/memory/manager.py`（L44-100 类定义 + L481-517 update_memory_task + L958-986 get_system_message）、`agno/agent/_default_tools.py`（L38-75）
+   - 如涉及后台任务编排（memory/learning/culture 自动提取）：`agno/agent/_managers.py`（L29-50 make_memories + L177-210 start_memory_future + L487-521 start_learning_future）
 2. **定位核心 Agno 特性**：识别 Agent 构造参数中的关键机制
 3. **补充追踪**：仅对速查表未覆盖的特性进行 Grep
 4. **组装文档**：按模板结构依次生成各章节
@@ -323,6 +327,9 @@ flowchart TD
      - 有 enable_session_summaries → `session/summary.py`（L22-106）
      - 有 stream_events / RunCompletedEvent → `run/agent.py`（L134-278）
      - 有 RunContext 用法 → `run/base.py`（L16-33）
+     - 有 `learning` / `LearningMachine` → `learn/machine.py`（L53-120 + L350-465 + L498-540）+ `learn/config.py`（全文）
+     - 有 `enable_agentic_memory` / `memory_manager` / `MemoryManager` → `memory/manager.py`（L44-100 + L481-517 + L958-986）+ `_default_tools.py` L38-75
+     - 有 `update_memory_on_run` / `add_memories_to_context` → `_managers.py` L29-50 + L177-210 + `_messages.py` L282-320
 6. **补充 Grep**：对速查表未覆盖的新特性进行针对性 Grep
 7. **TaskCreate**：为每个待生成的文件创建 task，便于跟踪进度和断点续做
 8. **分批 Write**：每批 3 个文件并行写入，完成后更新 task 状态，直至全部完成
@@ -411,8 +418,14 @@ Team.print_response()
 | `num_history_runs` | L129 | 限制历史运行次数 |
 | `num_history_messages` | L131 | 限制历史消息数量 |
 | `max_tool_calls_from_history` | L133 | 历史工具调用限制 |
+| `memory_manager` | L111 | MemoryManager 实例 |
+| `enable_agentic_memory` | L113 | 启用代理式记忆（注册 update_user_memory 工具） |
+| `update_memory_on_run` | L115 | 每次运行后自动提取记忆 |
+| `add_memories_to_context` | L119 | 将用户记忆注入 system prompt |
 | `db` | L123 | 数据库配置 |
 | `resolve_in_context` | L249 | 启用 session_state/dependencies 模板变量替换（默认 True） |
+| `learning` | L253 | LearningMachine 统一学习系统（bool 或 LearningMachine 实例） |
+| `add_learnings_to_context` | L255 | 将学习上下文注入 system prompt（默认 True） |
 | `store_history_messages` | L213 | 控制是否存储历史消息（默认 False=线性增长） |
 | `stream` | L302 | 流式响应 |
 | `stream_events` | L304 | 流式事件模式 |
@@ -498,6 +511,8 @@ Team.print_response()
 | 工具类 | 文件 | 行号 |
 |--------|------|------|
 | `_tools.get_tools()` | `agent/_tools.py` | L105 |
+| 注册 enable_agentic_memory 工具 | `agent/_tools.py` | L150-151 |
+| 注册 LearningMachine 工具 | `agent/_tools.py` | L154-160 |
 | `_tools.parse_tools()` | `agent/_tools.py` | L350-431 |
 | `_tools.determine_tools_for_model()` | `agent/_tools.py` | L434 |
 | `Toolkit` 基类 | `tools/toolkit.py` | L10 |
@@ -589,10 +604,79 @@ Team.print_response()
 
 | 函数 | 行号 | 说明 |
 |------|------|------|
+| `get_update_user_memory_function()` | L38 | 代理式记忆工具工厂（enable_agentic_memory 用） |
+| `update_user_memory()` | L39 | 调用 MemoryManager.update_memory_task() |
 | `update_session_state_tool()` | L347 | 内置状态更新工具实现（逐 key 合并） |
 | `make_update_session_state_entrypoint()` | L366 | 绑定 agent 的闭包工厂 |
 | `get_previous_sessions_messages_function()` | L411 | 跨会话搜索工具工厂 |
 | `get_previous_session_messages()` | L425 | 搜索工具实际实现（按 user_id 过滤） |
+
+### LearningMachine 速查（learn/machine.py）
+
+| 函数/类 | 行号 | 说明 |
+|---------|------|------|
+| `LearningMachine` | L53 | 统一学习系统协调器 dataclass |
+| `_initialize_stores()` | L111 | 懒加载初始化所有配置的存储 |
+| `_resolve_store()` | L164 | 根据 bool/Config/Store 创建具体存储实例 |
+| `_create_user_profile_store()` | L198 | 创建 UserProfileStore（继承 db/model） |
+| `build_context()` | L350 | 构建学习上下文字符串（调用 recall → _format_results） |
+| `get_tools()` | L420 | 获取 AGENTIC 模式工具（遍历各存储的 get_tools） |
+| `process()` | L498 | 运行后学习提取（遍历各存储的 process） |
+| `recall()` | L572 | 从各存储检索原始数据 |
+| `_format_results()` | L658 | 格式化检索结果为上下文字符串 |
+
+### LearningConfig 速查（learn/config.py）
+
+| 类 | 说明 |
+|----|------|
+| `LearningMode` | 枚举：ALWAYS（自动）、AGENTIC（工具）、PROPOSE（审批）、HITL（人类在环） |
+| `UserProfileConfig` | 用户画像配置（mode, db, model） |
+| `UserMemoryConfig` | 用户记忆配置 |
+| `SessionContextConfig` | 会话上下文配置 |
+| `EntityMemoryConfig` | 实体记忆配置（namespace） |
+| `LearnedKnowledgeConfig` | 学到的知识配置（knowledge） |
+| `DecisionLogConfig` | 决策日志配置 |
+
+### MemoryManager 速查（memory/manager.py）
+
+> `memory/manager.py` 约 70KB，必须用 offset/limit 分段读取。
+
+| 函数/类 | 行号 | 说明 |
+|---------|------|------|
+| `MemoryManager` | L44 | 记忆管理器 dataclass |
+| `__init__()` | L76 | 构造函数（model 支持 str 自动转换） |
+| `get_user_memories()` | L165 | 获取用户记忆列表 |
+| `add_user_memory()` | L211 | 添加单条记忆 |
+| `create_user_memories()` | L368 | 从对话消息批量创建记忆（update_memory_on_run 用） |
+| `update_memory_task()` | L481 | 工具调用入口（enable_agentic_memory 用） |
+| `run_memory_task()` | 内部 | 构建独立模型调用执行记忆 CRUD |
+| `search_user_memories()` | L588 | 搜索记忆（last_n/first_n/agentic） |
+| `get_system_message()` | L958 | 记忆管理器的 system prompt |
+| `determine_tools_for_model()` | L938 | 将记忆工具转换为 Function 列表 |
+
+### 后台任务编排速查（agent/_managers.py）
+
+> `_managers.py` 统一管理 memory、learning、cultural knowledge 的后台提取。
+
+| 函数 | 行号 | 说明 |
+|------|------|------|
+| `make_memories()` | L29 | 同步创建记忆（update_memory_on_run 模式） |
+| `start_memory_future()` | L177 | 后台线程启动记忆提取（非 agentic 时） |
+| `get_user_memories()` | L212 | 获取用户记忆（自动初始化 memory_manager） |
+| `make_cultural_knowledge()` | L259 | 同步创建文化知识 |
+| `process_learnings()` | L398 | 同步处理学习提取（调用 _learning.process） |
+| `start_learning_future()` | L487 | 后台线程启动学习提取 |
+| `astart_learning_task()` | L445 | 异步任务版学习提取 |
+
+**后台提取触发条件：**
+
+| 功能 | 触发条件 | 后台方式 |
+|------|---------|---------|
+| 记忆 | `update_memory_on_run=True` 且 `not enable_agentic_memory` | `background_executor.submit()` |
+| 学习 | `agent._learning is not None` | `background_executor.submit()` |
+| 文化 | `update_cultural_knowledge=True` | `background_executor.submit()` |
+
+> 注意：`enable_agentic_memory=True` 时不走后台提取，而是通过工具由模型主动调用。
 
 ### tool_hooks 执行链速查（tools/function.py）
 
@@ -669,6 +753,10 @@ Team.print_response()
   - `get_chat_history` → 读 `agent.py` L1005-1011
   - `AsyncSqliteDb` / 异步模式 → 确认使用 `aprint_response` / `asyncio.run`
   - `InMemoryDb` → 读 `db/in_memory/in_memory_db.py` L27
+  - `learning` / `LearningMachine` → 读 `learn/machine.py`（L53-120 + L350-465 + L498-540）+ `learn/config.py`（全文）
+  - `enable_agentic_memory` / `memory_manager` / `MemoryManager` → 读 `memory/manager.py`（L44-100 + L481-517 + L958-986）+ `_default_tools.py` L38-75 + `_messages.py` L282-320
+  - `update_memory_on_run` → 读 `_managers.py` L29-50 + L177-210
+  - `add_memories_to_context` → 读 `_messages.py` L282-320（步骤 3.3.9 记忆注入 + agentic 说明）
 - **用 TaskCreate 跟踪批量进度**：批量模式下为每个文件创建 task，完成后标记 completed，便于断点续做
 - **`utils/callables.py` 较小（~613 行）**：可一次性全文读取，无需分段
 
@@ -709,6 +797,15 @@ Team.print_response()
 - **核心组件解析**：解释状态的生命周期（初始化 → RunContext 传递 → 工具函数修改 → 持久化）
 - **System Prompt 组装**：特别关注 `{var}` 模板变量替换（步骤 fmt）和 `<session_state>` XML 注入（步骤 3.3.17）
 - **对比表**：如果该文件的机制与其他文件有对比意义（如 `enable_agentic_state` vs 自定义工具），用表格对比
+
+### Memory/Learning 文件
+
+当文件涉及 `MemoryManager`、`enable_agentic_memory`、`LearningMachine` 等记忆/学习机制时：
+- **架构分层**：如涉及双模型（主模型 + 记忆/学习模型），在底部展示两个模型节点，标注各自用途
+- **核心组件解析**：区分两种记忆模式（`enable_agentic_memory` 工具式 vs `update_memory_on_run` 自动式）、学习模式（`LearningMode.AGENTIC` vs `ALWAYS`）
+- **System Prompt 组装**：特别关注步骤 3.3.9（记忆注入 + `<updating_user_memories>` 工具说明）和步骤 3.3.12（学习上下文注入 `_learning.build_context()`）
+- **完整 API 请求**：如涉及 MemoryManager 的独立模型调用（如 `update_memory_task` 触发 gpt-5-mini），展示主模型请求和 MemoryManager 内部请求两个
+- **Mermaid 流程图**：展示工具调用触发 MemoryManager/LearningMachine 的内部流程，用 subgraph 分组
 
 ### 异步文件
 
