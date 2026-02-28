@@ -305,6 +305,10 @@ flowchart TD
    - 如涉及 LearningMachine/learning：`agno/learn/machine.py`（L53-120 类定义 + L350-465 build_context/get_tools + L498-540 process）、`agno/learn/config.py`（全文，~464 行）
    - 如涉及 enable_agentic_memory/memory_manager/MemoryManager：`agno/memory/manager.py`（L44-100 类定义 + L481-517 update_memory_task + L958-986 get_system_message）、`agno/agent/_default_tools.py`（L38-75）
    - 如涉及后台任务编排（memory/learning/culture 自动提取）：`agno/agent/_managers.py`（L29-50 make_memories + L177-210 start_memory_future + L487-521 start_learning_future）
+   - 如涉及 pre_hooks/post_hooks/Guardrail：`agno/agent/_hooks.py`（全文）+ `agno/utils/hooks.py`（全文）+ `agno/exceptions.py`（L122-173）
+   - 如涉及内置 Guardrail（PIIDetectionGuardrail/OpenAIModerationGuardrail/PromptInjectionGuardrail）：对应 `agno/guardrails/*.py`（均为小文件，可全文读取）
+   - 如涉及自定义 BaseGuardrail 子类：`agno/guardrails/base.py`（全文，~20 行）
+   - 如涉及 RunInput/RunOutput（hook 参数类型）：`agno/run/agent.py`（L29-65 RunInput + L581-624 RunOutput）
 2. **定位核心 Agno 特性**：识别 Agent 构造参数中的关键机制
 3. **补充追踪**：仅对速查表未覆盖的特性进行 Grep
 4. **组装文档**：按模板结构依次生成各章节
@@ -342,6 +346,12 @@ flowchart TD
      - 有 `learning` / `LearningMachine` → `learn/machine.py`（L53-120 + L350-465 + L498-540）+ `learn/config.py`（全文）
      - 有 `enable_agentic_memory` / `memory_manager` / `MemoryManager` → `memory/manager.py`（L44-100 + L481-517 + L958-986）+ `_default_tools.py` L38-75
      - 有 `update_memory_on_run` / `add_memories_to_context` → `_managers.py` L29-50 + L177-210 + `_messages.py` L282-320
+     - 有 `pre_hooks` / `post_hooks` / `BaseGuardrail` → `_hooks.py`（全文）+ `utils/hooks.py`（全文）+ `exceptions.py` L122-173
+     - 有 `PIIDetectionGuardrail` → `guardrails/pii.py`（全文）
+     - 有 `OpenAIModerationGuardrail` → `guardrails/openai.py`（全文）
+     - 有 `PromptInjectionGuardrail` → `guardrails/prompt_injection.py`（全文）
+     - 有自定义 `BaseGuardrail` 子类 → `guardrails/base.py`（全文）
+     - 有 `RunInput` / `RunOutput`（hook 参数） → `run/agent.py` L29-65 + L581-624
 6. **补充 Grep**：对速查表未覆盖的新特性进行针对性 Grep
 7. **TaskCreate**：为每个待生成的文件创建 task，便于跟踪进度和断点续做
 8. **分批 Write**：每批 3 个文件并行写入，完成后更新 task 状态，直至全部完成
@@ -360,6 +370,12 @@ Agent.print_response()          agent.py:1053
       └─ stream=False → print_response()
           └─ _run._run()           _run.py:316
               ├─ 1. read_or_create_session()
+              ├─ 3. normalize_pre/post_hooks()  _run.py:1250-1256
+              │     └─ normalize_pre_hooks()     utils/hooks.py:70
+              │     └─ normalize_post_hooks()    utils/hooks.py:113
+              ├─ 4. execute_pre_hooks()   _hooks.py:43
+              │     └─ filter_hook_args()  utils/hooks.py:156
+              │     └─ InputCheckError? → 中断运行
               ├─ 5. get_tools()           _tools.py:105
               │     ├─ resolve_callable_tools()  callables.py:213
               │     │     ├─ is_callable_factory()
@@ -370,10 +386,12 @@ Agent.print_response()          agent.py:1053
               ├─ 6. get_run_messages()    _messages.py:1146
               │     ├─ get_system_message()  _messages.py:106
               │     └─ get_user_message()
-              └─ 9. Model.response(       _run.py:501
-                      tool_choice=...,    _run.py:504
-                      tool_call_limit=... _run.py:505
-                    )
+              ├─ 9. Model.response(       _run.py:501
+              │       tool_choice=...,    _run.py:504
+              │       tool_call_limit=... _run.py:505
+              │     )
+              └─ 10. execute_post_hooks()  _hooks.py:266
+                    └─ OutputCheckError? → 设置 error 状态
 
 Team.print_response()
   └─ Team._run()
@@ -405,6 +423,9 @@ Team.print_response()
 | `tool_call_limit` | L162 | 工具调用次数限制 |
 | `tool_choice` | L169 | 工具选择策略（none/auto/指定函数） |
 | `tool_hooks` | L172 | 工具调用中间件 |
+| `pre_hooks` | L176 | 前置 hook 列表（Callable / BaseGuardrail / BaseEval） |
+| `post_hooks` | L178 | 后置 hook 列表（Callable / BaseGuardrail / BaseEval） |
+| `_run_hooks_in_background` | L180 | 后台执行 hooks（AgentOS 设置） |
 | `system_message` | L217 | 自定义 system message |
 | `build_context` | L223 | 是否构建上下文 |
 | `description` | L227 | Agent 描述 |
@@ -810,6 +831,93 @@ Team.print_response()
 | `PostgresDb` | `db/postgres/` | PostgreSQL 后端 |
 | `InMemoryDb` | `db/in_memory/in_memory_db.py:27` | 内存数据库（不持久化） |
 
+### Guardrails / Hooks 速查
+
+> Agent 的 `pre_hooks`/`post_hooks` 统一处理护栏（Guardrail）、评估（Eval）和普通函数 hook。
+
+#### 核心类型（guardrails/）
+
+| 类 | 文件 | 说明 |
+|----|------|------|
+| `BaseGuardrail` | `guardrails/base.py` L8 | 护栏抽象基类，定义 `check()` / `async_check()` 接口 |
+| `PIIDetectionGuardrail` | `guardrails/pii.py` L10 | PII 检测（SSN/信用卡/邮箱/电话，支持 `mask_pii` 脱敏模式） |
+| `OpenAIModerationGuardrail` | `guardrails/openai.py` L12 | OpenAI Moderation API 审核（支持 `raise_for_categories` 自定义类别） |
+| `PromptInjectionGuardrail` | `guardrails/prompt_injection.py` L9 | Prompt 注入检测（17 个默认关键词，支持 `injection_patterns` 自定义） |
+
+#### 异常类型（exceptions.py）
+
+| 类 | 行号 | 说明 |
+|----|------|------|
+| `CheckTrigger` | L122 | 枚举：`OFF_TOPIC`, `INPUT_NOT_ALLOWED`, `OUTPUT_NOT_ALLOWED`, `VALIDATION_FAILED`, `PROMPT_INJECTION`, `PII_DETECTED` |
+| `InputCheckError` | L134 | 输入检查异常（携带 `message`, `check_trigger`, `additional_data`） |
+| `OutputCheckError` | L155 | 输出检查异常（结构与 InputCheckError 相同） |
+
+#### Hook 规范化（utils/hooks.py）
+
+| 函数 | 行号 | 说明 |
+|------|------|------|
+| `normalize_pre_hooks()` | L70 | 将 `BaseGuardrail` → `.check`/`.async_check` 绑定方法，`BaseEval` → `.pre_check`，普通函数保留 |
+| `normalize_post_hooks()` | L113 | 同上，`BaseEval` → `.post_check` |
+| `filter_hook_args()` | L156 | 根据函数签名过滤参数（`inspect.signature` → 仅传递接受的参数） |
+| `is_guardrail_hook()` | L57 | 判断 hook 是否为护栏（后台模式下护栏必须同步执行） |
+| `should_run_hook_in_background()` | L42 | 检查 `@hook(run_in_background=True)` 装饰器 |
+| `copy_args_for_background()` | L15 | 深拷贝敏感参数（run_input/run_context 等）防止竞态 |
+
+#### Hook 执行（agent/_hooks.py）
+
+| 函数 | 行号 | 说明 |
+|------|------|------|
+| `execute_pre_hooks()` | L43 | 同步版 pre_hooks 执行（按顺序，`InputCheckError` 直接传播） |
+| `aexecute_pre_hooks()` | L156 | 异步版 pre_hooks 执行 |
+| `execute_post_hooks()` | L266 | 同步版 post_hooks 执行（参数为 `run_output` 而非 `run_input`） |
+| `aexecute_post_hooks()` | L369 | 异步版 post_hooks 执行 |
+
+**pre_hooks 参数注入映射（_hooks.py L62-70）：**
+
+| hook 函数参数名 | 注入内容 | 说明 |
+|----------------|---------|------|
+| `run_input` | `RunInput` 实例 | 用户输入（可修改，如 PII 脱敏） |
+| `agent` | `Agent` 实例 | |
+| `session` | `AgentSession` | 会话对象 |
+| `run_context` | `RunContext` | 运行上下文 |
+| `user_id` | 用户 ID | |
+| `debug_mode` | 调试模式 | |
+| `metadata` | `run_context.metadata` | |
+
+**post_hooks 参数注入映射（_hooks.py L285-293）：**
+
+| hook 函数参数名 | 注入内容 | 说明 |
+|----------------|---------|------|
+| `run_output` | `RunOutput` 实例 | 模型输出（含 content/status 等） |
+| `agent` | `Agent` 实例 | |
+| `session` | `AgentSession` | |
+| `run_context` | `RunContext` | |
+| `user_id` | 用户 ID | |
+
+#### _run.py 中的 Hook 调用点
+
+| 步骤 | 行号 | 说明 |
+|------|------|------|
+| 规范化 | L1250-1256 | 首次运行时 `normalize_pre/post_hooks()`（`_hooks_normalised` 标记） |
+| 步骤 4 pre_hooks | L410-425 | 模型调用前执行 `execute_pre_hooks()` |
+| 步骤 10 post_hooks | L559-572 | 模型响应后执行 `execute_post_hooks()` |
+| 异常处理 | L628-646 | 捕获 `InputCheckError`/`OutputCheckError` → `RunStatus.error` |
+
+#### 输入/输出容器（run/agent.py）
+
+| 类 | 行号 | 说明 |
+|----|------|------|
+| `RunInput` | L29 | 输入容器（`input_content`, `images`, `videos`, `audios`, `files`） |
+| `RunInput.input_content_string()` | L49 | 将各种输入类型转为字符串（str/BaseModel/Message/list） |
+| `RunOutput` | L581 | 输出容器（`content`, `status`, `session_state`, `metrics` 等） |
+
+**后台执行逻辑（_hooks.py L79-97）：**
+
+当 `_run_hooks_in_background=True` 时：
+1. 护栏（`is_guardrail_hook`）始终同步执行（`InputCheckError` 必须传播）
+2. 非护栏 hook 缓冲，待所有护栏通过后才提交到后台任务队列
+3. 深拷贝 `run_input`/`run_context` 防止竞态条件
+
 ### 其他速查
 
 | 函数/类 | 文件 | 行号 | 说明 |
@@ -857,6 +965,13 @@ Team.print_response()
   - `enable_agentic_memory` / `memory_manager` / `MemoryManager` → 读 `memory/manager.py`（L44-100 + L481-517 + L958-986）+ `_default_tools.py` L38-75 + `_messages.py` L282-320
   - `update_memory_on_run` → 读 `_managers.py` L29-50 + L177-210
   - `add_memories_to_context` → 读 `_messages.py` L282-320（步骤 3.3.9 记忆注入 + agentic 说明）
+  - `pre_hooks` / `post_hooks` / `BaseGuardrail` → 读 `agent/_hooks.py`（全文，~470 行）+ `utils/hooks.py`（全文，~179 行）
+  - `PIIDetectionGuardrail` → 读 `guardrails/pii.py`（全文，~95 行）
+  - `OpenAIModerationGuardrail` → 读 `guardrails/openai.py`（全文，~145 行）
+  - `PromptInjectionGuardrail` → 读 `guardrails/prompt_injection.py`（全文，~53 行）
+  - 自定义 `BaseGuardrail` 子类 → 读 `guardrails/base.py`（全文，~20 行）+ `exceptions.py` L122-173（CheckTrigger/InputCheckError/OutputCheckError）
+  - `RunInput` / `RunOutput`（hook 参数）→ 读 `run/agent.py` L29-65（RunInput）+ L581-624（RunOutput）
+  - `InputCheckError` / `OutputCheckError` 处理 → 读 `_run.py` L628-646（异常捕获 → RunStatus.error）
 - **用 TaskCreate 跟踪批量进度**：批量模式下为每个文件创建 task，完成后标记 completed，便于断点续做
 - **`utils/callables.py` 较小（~613 行）**：可一次性全文读取，无需分段
 
@@ -922,6 +1037,23 @@ Team.print_response()
   - Agentic RAG：展示多轮请求（工具调用 + 工具结果），注意 `search_knowledge_base` 的工具签名（有无 `filters` 参数取决于 `enable_agentic_knowledge_filters`）
   - Traditional RAG：展示单轮请求，用户消息末尾包含 `<references>` 标签
 - **对比表**：如同一文件展示多种 RAG 策略（如 knowledge_filters.py 的 static vs agentic），用对比表格突出差异
+
+### Guardrails / Hooks 文件
+
+当文件涉及 `pre_hooks`、`post_hooks`、`BaseGuardrail`、`PIIDetectionGuardrail`、`OpenAIModerationGuardrail`、`PromptInjectionGuardrail` 等护栏/hook 机制时：
+- **核心配置一览**：重点标注 `pre_hooks`（列出所有注册的 hook/guardrail）和 `post_hooks`，如混合使用多种类型需逐个列出
+- **架构分层**：展示 hook 的执行位置（pre_hooks 在模型调用前，post_hooks 在模型调用后），如 `OpenAIModerationGuardrail` 涉及外部 API 调用，在底部展示额外的 Moderation API 节点
+- **核心组件解析**：
+  - 区分 `BaseGuardrail` 子类（规范化为 `.check`/`.async_check` 绑定方法）和普通函数 hook（直接保留）
+  - 解释 `normalize_pre_hooks()` 的规范化行为和 `filter_hook_args()` 的参数注入机制
+  - 如有 `mask_pii=True`，解释脱敏模式修改 `run_input.input_content` 的数据流
+  - 如混合 hook 和 guardrail，说明执行顺序和异常传播区别（guardrail 的 `InputCheckError` 会传播，普通 hook 的异常仅记录日志）
+- **完整 API 请求**：
+  - 检查通过时：正常展示 API 请求
+  - 检查失败时：明确标注「不会发出 API 请求」，描述异常传播路径和最终 `RunOutput(status=RunStatus.error)`
+  - 如 `OpenAIModerationGuardrail`：先展示 Moderation API 调用，再展示主模型 API 调用
+- **Mermaid 流程图**：用菱形节点展示检查通过/失败的分支，失败路径指向红色 error 节点（`fill:#ffcdd2`）
+- **对比表**：如同一文件展示拦截 vs 脱敏、默认类别 vs 自定义类别等对比场景，用表格突出差异
 
 ### 异步文件
 
