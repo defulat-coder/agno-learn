@@ -271,6 +271,10 @@ flowchart TD
    - `agno/agent/_messages.py`（L106-260，`get_system_message()`）
    - `agno/agent/_messages.py`（L1146-1345，`get_run_messages()`）
    - 如涉及工具：`agno/agent/_tools.py`（L105-195，`get_tools()`）
+   - 如涉及 callable factory（tools/knowledge/members 为函数）：`agno/utils/callables.py`（全文，~613 行）
+   - 如涉及 Toolkit 类：`agno/tools/toolkit.py`（L10-80）
+   - 如涉及 Literal 类型参数：`agno/utils/json_schema.py`（L124-143）
+   - 如涉及 Team：`agno/team/team.py`
    - 如涉及特定模型：对应模型文件
    - 如涉及 output_model/parser_model：`agno/agent/_response.py`
 2. **定位核心 Agno 特性**：识别 Agent 构造参数中的关键机制
@@ -285,10 +289,20 @@ flowchart TD
 1. **Glob** 目标目录下所有 `.py` 文件 + 已有 `.md` 文件
 2. **过滤**：排除 `__init__.py`、`__pycache__` 等非示例文件；跳过已有同名 `.md` 的文件
 3. **并行 Read** 所有目标 `.py` 文件（单次调用）
-4. **Read 源码**（如同一会话中未读取过）：并行读取 agent.py、_messages.py（分段）、responses.py 等
-5. **补充 Grep**：对速查表未覆盖的新特性进行针对性 Grep
-6. **分批 Write**：每批 3 个文件并行写入，直至全部完成
-7. **确认**：Glob 检查所有 `.md` 文件已生成，输出总结表格
+4. **扫描特性**：浏览所有 `.py` 文件内容，识别使用的 Agno 特性（callable factory、Toolkit、Literal、Team 等），据此决定需要额外读取的源码文件
+5. **Read 源码**（如同一会话中未读取过）：
+   - 基础（必读）：agent.py（L67-350）、_messages.py（L106-260 + L1146-1345）
+   - 按需追加（根据步骤 4 的扫描结果）：
+     - 有工具 → `_tools.py`（L105-195 + L350-477）
+     - 有 callable factory → `utils/callables.py`（全文）
+     - 有 Toolkit 子类 → `tools/toolkit.py`（L10-80）
+     - 有 Literal 参数 → `utils/json_schema.py`（L124-143）
+     - 有 Team → `team/team.py`
+     - 有 tool_call_limit/tool_choice → `_run.py`（L490-510）
+6. **补充 Grep**：对速查表未覆盖的新特性进行针对性 Grep
+7. **TaskCreate**：为每个待生成的文件创建 task，便于跟踪进度和断点续做
+8. **分批 Write**：每批 3 个文件并行写入，完成后更新 task 状态，直至全部完成
+9. **确认**：Glob 检查所有 `.md` 文件已生成，输出总结表格
 
 ## Agno 源码关键位置速查表
 
@@ -304,11 +318,25 @@ Agent.print_response()          agent.py:1053
           └─ _run._run()           _run.py:316
               ├─ 1. read_or_create_session()
               ├─ 5. get_tools()           _tools.py:105
+              │     ├─ resolve_callable_tools()  callables.py:213
+              │     │     ├─ is_callable_factory()
+              │     │     ├─ _compute_cache_key()
+              │     │     └─ invoke_callable_factory()
               │     └─ determine_tools_for_model()  _tools.py:434
+              │           └─ parse_tools()  _tools.py:350
               ├─ 6. get_run_messages()    _messages.py:1146
               │     ├─ get_system_message()  _messages.py:106
               │     └─ get_user_message()
-              └─ 9. Model.invoke() / invoke_stream()
+              └─ 9. Model.response(       _run.py:501
+                      tool_choice=...,    _run.py:504
+                      tool_call_limit=... _run.py:505
+                    )
+
+Team.print_response()
+  └─ Team._run()
+        ├─ resolve_callable_members()  callables.py:374
+        ├─ 委派任务给成员 Agent
+        └─ 各成员 Agent._run()（独立运行）
 ```
 
 ### Agent 属性定义（agent.py）
@@ -318,9 +346,11 @@ Agent.print_response()          agent.py:1053
 | `Agent` 类定义 | L67 | `@dataclass(init=False)` |
 | `model` | L70 | 模型实例 |
 | `name` | L72 | Agent 名称 |
-| `tools` | L159 | 工具列表 |
+| `session_state` | L84 | 默认 session state 字典 |
+| `tools` | L159 | 工具列表（List 或 Callable 工厂） |
 | `tool_call_limit` | L162 | 工具调用次数限制 |
-| `tool_choice` | L169 | 工具选择策略 |
+| `tool_choice` | L169 | 工具选择策略（none/auto/指定函数） |
+| `tool_hooks` | L172 | 工具调用中间件 |
 | `system_message` | L217 | 自定义 system message |
 | `build_context` | L223 | 是否构建上下文 |
 | `description` | L227 | Agent 描述 |
@@ -341,6 +371,7 @@ Agent.print_response()          agent.py:1053
 | `output_model` | L287 | 输出模型 |
 | `output_model_prompt` | L289 | 输出模型 prompt |
 | `save_response_to_file` | L298 | 保存响应到文件 |
+| `cache_callables` | L352 | 控制是否缓存 callable factory 结果（默认 True） |
 | `role` | L312 | Agent 角色（团队中） |
 | `introduction` | L221 | 初始问候消息 |
 | `system_message_role` | L219 | system 消息角色 |
@@ -412,12 +443,75 @@ Agent.print_response()          agent.py:1053
 | 工具类 | 文件 | 行号 |
 |--------|------|------|
 | `_tools.get_tools()` | `agent/_tools.py` | L105 |
+| `_tools.parse_tools()` | `agent/_tools.py` | L350-431 |
 | `_tools.determine_tools_for_model()` | `agent/_tools.py` | L434 |
+| `Toolkit` 基类 | `tools/toolkit.py` | L10 |
+| `Toolkit.__init__()` | `tools/toolkit.py` | L15-80 |
+| `Function` | `tools/function.py` | L40 |
+| `Function.from_callable()` | `tools/function.py` | 搜索 `def from_callable` |
 | `DuckDuckGoTools` | `tools/duckduckgo.py` | L6 |
 | `WebSearchTools` | `tools/websearch.py` | L16 |
 | `WebSearchTools.web_search()` | `tools/websearch.py` | L74 |
 | `HackerNewsTools` | `tools/hackernews.py` | 顶部 |
 | `YFinanceTools` | `tools/yfinance.py` | 顶部 |
+
+### Callable Factory 速查（utils/callables.py）
+
+> 工具/知识库/团队成员均可用 callable 工厂动态解析，共享此文件的逻辑。
+
+| 函数 | 行号 | 说明 |
+|------|------|------|
+| `is_callable_factory()` | L40 | 判断值是否为工厂函数（排除 Toolkit/Function/type） |
+| `invoke_callable_factory()` | L60 | 签名检查 + 参数注入（agent/run_context/session_state） |
+| `ainvoke_callable_factory()` | L104 | 异步版本 |
+| `_compute_cache_key()` | L133 | 缓存 key 优先级：custom_key_fn > user_id > session_id > None |
+| `resolve_callable_tools()` | L213 | 解析 callable tools 工厂 |
+| `resolve_callable_knowledge()` | L294 | 解析 callable knowledge 工厂 |
+| `resolve_callable_members()` | L374 | 解析 callable members 工厂（Team 用） |
+| `get_resolved_tools()` | L595 | 获取解析后的工具（run_context > entity） |
+| `get_resolved_members()` | L605 | 获取解析后的成员 |
+| `clear_callable_cache()` | L453 | 清除缓存 |
+
+**签名注入参数映射（invoke_callable_factory L79-89）：**
+
+| 工厂函数参数名 | 注入内容 | 说明 |
+|---------------|---------|------|
+| `agent` | Agent 实例 | |
+| `team` | Team 实例 | |
+| `run_context` | 完整 RunContext 对象 | 含 user_id/session_id/session_state |
+| `session_state` | `run_context.session_state or {}` | 仅 state 字典 |
+
+**缓存行为（受 `cache_callables` 控制）：**
+
+| `cache_callables` | 缓存行为 | 适用场景 |
+|-------------------|---------|---------|
+| `True`（默认） | 按 cache_key 缓存，同 key 不重复调用 | 角色固定，同用户工具不变 |
+| `False` | 每次运行重新调用工厂 | session_state 频繁变化 |
+
+### JSON Schema 速查（utils/json_schema.py）
+
+| 函数 | 行号 | 说明 |
+|------|------|------|
+| `get_json_schema_for_arg()` | L124 | 类型注解 → JSON Schema 转换入口 |
+| Literal 处理 | L127-143 | `Literal["a","b"]` → `{"type":"string","enum":["a","b"]}` |
+
+**Literal 类型转换规则（L127-143）：**
+
+| Literal 值类型 | JSON Schema |
+|---------------|-------------|
+| 全 `str` | `{"type": "string", "enum": [...]}` |
+| 全 `bool` | `{"type": "boolean", "enum": [...]}` |
+| 全 `int` | `{"type": "integer", "enum": [...]}` |
+| `int`+`float` | `{"type": "number", "enum": [...]}` |
+| 混合 | `{"enum": [...]}` |
+
+### Team 速查
+
+| 类/函数 | 文件 | 说明 |
+|---------|------|------|
+| `Team` | `team/team.py` | 团队类，`members` 支持 List 或 Callable |
+| `members` | `team/team.py` | 成员列表或工厂函数 |
+| `cache_callables` | `team/team.py` | 控制是否缓存工厂结果 |
 
 ### 其他速查
 
@@ -436,6 +530,14 @@ Agent.print_response()          agent.py:1053
 - 记录行号时使用 `L<行号>` 格式
 - 如果速查表行号与实际不符，用 `Grep "def get_system_message"` 等快速重新定位
 - **同一会话内**，agno 源码只需读取一次，后续目录生成时直接复用已有知识
+- **按特性决定额外源码**：扫描目标 `.py` 文件后，根据以下特征决定需要读取的额外源码：
+  - `tools=<callable>` → 读 `utils/callables.py`
+  - `Toolkit` 子类 → 读 `tools/toolkit.py`
+  - `Literal[...]` 参数 → 读 `utils/json_schema.py`
+  - `Team(members=...)` → 读 `team/team.py` + `utils/callables.py`
+  - `tool_call_limit` / `tool_choice` → 读 `_run.py` 对应行
+- **用 TaskCreate 跟踪批量进度**：批量模式下为每个文件创建 task，完成后标记 completed，便于断点续做
+- **`utils/callables.py` 较小（~613 行）**：可一次性全文读取，无需分段
 
 ## 错误处理
 
@@ -449,10 +551,29 @@ Agent.print_response()          agent.py:1053
 
 > **禁止使用 Agent 子进程。** 实战中 Agent 子进程多次出现 `API Error: Failed to parse JSON` 等不可恢复错误，即使重试 3 次也无法解决。直接处理（主进程 Read + Write）**零失败**，效率更高。
 
+## 特殊文件类型处理
+
+### 多 Agent 文件（如 tool_choice.py）
+
+当一个文件定义多个 Agent 做对比时：
+- **核心配置一览**：用对比表格，每个 Agent 一行，突出差异字段
+- **完整 API 请求**：为每个 Agent 各写一个请求示例，用注释标注差异
+- **Mermaid 流程图**：用条件分支（菱形节点）展示不同策略的执行路径
+
+### Team 文件（如 03_team_callable_members.py）
+
+当文件使用 Team 时：
+- **核心配置一览**：分组列出 Team 配置和各成员 Agent 配置
+- **架构分层**：展示 Team → 成员 Agent 的委派关系
+- **System Prompt 组装**：注明是 Team 协调层的 prompt，各成员 Agent 有各自独立的 prompt
+- **完整 API 请求**：展示 Team 协调层的请求（含 transfer_to_X 工具）和代表性成员 Agent 的请求
+- **核心调用链**：使用 Team 的调用链而非 Agent 的
+
 ## 注意事项
 
 - **不要虚构行号**：必须通过实际 Read/Grep 确认源码行号
 - **不要遗漏配置项**：核心配置一览表要列出所有显式参数
-- **API 请求要准确**：根据实际的模型类型确定 role（`developer` for OpenAI Chat，`user` for Responses API 等）
+- **API 请求要准确**：OpenAIResponses 用 `input` 参数、role 映射 `system→developer`；OpenAIChat 用 `messages` 参数、role 保持 `system`
 - **Mermaid 节点 ID 不能有空格**：用驼峰或下划线命名
 - **跳过已存在的 .md 文件**：批量模式下，如果同名 .md 已存在则跳过
+- **先扫描再读源码**：批量模式下，先读完所有 `.py` 文件识别特性，再按需读取源码，避免读取不需要的文件
