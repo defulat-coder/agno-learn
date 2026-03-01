@@ -1,255 +1,255 @@
 # CLAUDE.md — Agno
 
-Instructions for Claude Code when working on this codebase.
+为在此代码库中工作的 Claude Code 提供的说明。
 
 ---
 
-## Repository Structure
+## 仓库结构
 
 ```
 .
-├── libs/agno/agno/          # Core framework code
-├── cookbook/                # Examples, patterns and test cases (organized by topic)
-├── scripts/                 # Development and build scripts
-├── specs/                   # Design documents (symlinked, private)
-├── docs/                    # Documentation (symlinked, private)
-└── .cursorrules             # Coding patterns and conventions
+├── libs/agno/agno/          # 核心框架代码
+├── cookbook/                # 示例、模式和测试用例（按主题组织）
+├── scripts/                 # 开发和构建脚本
+├── specs/                   # 设计文档（符号链接，私有）
+├── docs/                    # 文档（符号链接，私有）
+└── .cursorrules             # 编码模式和约定
 ```
 
 ---
 
-## Conductor Notes
+## Conductor 说明
 
-When working in Conductor, you can use the `.context/` directory for scratch notes or agent-to-agent handoff artifacts. This directory is gitignored.
+在 Conductor 中工作时，可以使用 `.context/` 目录存放临时笔记或 Agent 间交接产物。该目录已被 gitignore。
 
 ---
 
-## Setting Up Symlinks
+## 设置符号链接
 
-The `specs/` and `docs/` directories are symlinked from external locations. For a fresh clone or new workspace, create these symlinks:
+`specs/` 和 `docs/` 目录从外部位置符号链接。对于新克隆或新工作区，创建以下符号链接：
 
 ```bash
 ln -s ~/code/specs specs
 ln -s ~/code/docs docs
 ```
 
-These contain private design documents and documentation that are not checked into the repository.
+这些目录包含未提交到仓库的私有设计文档和说明。
 
 ---
 
-## Virtual Environments
+## 虚拟环境
 
-This project uses two virtual environments:
+本项目使用两个虚拟环境：
 
-| Environment | Purpose | Setup |
+| 环境 | 用途 | 安装 |
 |-------------|---------|-------|
-| `.venv/` | Development: tests, formatting, validation | `./scripts/dev_setup.sh` |
-| `.venvs/demo/` | Cookbooks: has all demo dependencies | `./scripts/demo_setup.sh` |
+| `.venv/` | 开发：测试、格式化、验证 | `./scripts/dev_setup.sh` |
+| `.venvs/demo/` | Cookbook：包含所有 demo 依赖 | `./scripts/demo_setup.sh` |
 
-**Use `.venv`** for development tasks (`pytest`, `./scripts/format.sh`, `./scripts/validate.sh`).
+**使用 `.venv`** 执行开发任务（`pytest`、`./scripts/format.sh`、`./scripts/validate.sh`）。
 
-**Use `.venvs/demo`** for running cookbook examples.
+**使用 `.venvs/demo`** 运行 cookbook 示例。
 
 ---
 
-## Testing Cookbooks
+## 测试 Cookbook
 
-Apart from implementing features, your most important task will be to test and maintain the cookbooks in `cookbook/` directory.
+除实现功能外，你最重要的任务是测试和维护 `cookbook/` 目录中的 cookbook。
 
-> See `cookbook/08_learning/` for the golden standard.
+> 参见 `cookbook/08_learning/` 作为黄金标准。
 
-### Quick Reference
+### 快速参考
 
-**Test Environment:**
+**测试环境：**
 
 ```bash
-# Virtual environment with all dependencies
+# 包含所有依赖的虚拟环境
 .venvs/demo/bin/python
 
-# Setup (if needed)
+# 安装（如需要）
 ./scripts/demo_setup.sh
 
-# Database (if needed)
+# 数据库（如需要）
 ./cookbook/scripts/run_pgvector.sh
 ```
 
-**Run a cookbook:**
+**运行 cookbook：**
 ```bash
 .venvs/demo/bin/python cookbook/<folder>/<file>.py
 ```
 
-### Expected Cookbook Structure
+### 预期的 Cookbook 结构
 
-Each cookbook folder should have the following files:
-- `README.md` — The README for the cookbook.
-- `TEST_LOG.md` — Test results log.
+每个 cookbook 目录应包含以下文件：
+- `README.md` — Cookbook 的说明文档。
+- `TEST_LOG.md` — 测试结果日志。
 
-### Testing Workflow
+### 测试工作流
 
-**1. Before Testing**
-- Ensure the virtual environment exists (run `./scripts/demo_setup.sh` if needed)
-- Start any required services (e.g., `./cookbook/scripts/run_pgvector.sh`)
+**1. 测试前**
+- 确保虚拟环境存在（如需要请运行 `./scripts/demo_setup.sh`）
+- 启动所需服务（例如 `./cookbook/scripts/run_pgvector.sh`）
 
-**2. Running Tests**
+**2. 运行测试**
 ```bash
-# Run individual cookbook
+# 运行单个 cookbook
 .venvs/demo/bin/python cookbook/<folder>/<file>.py
 
-# Tail output for long tests
+# 长时间测试时查看尾部输出
 .venvs/demo/bin/python cookbook/<folder>/<file>.py 2>&1 | tail -100
 ```
 
-**3. Updating TEST_LOG.md**
+**3. 更新 TEST_LOG.md**
 
-After each test, update the cookbook's `TEST_LOG.md` with:
-- Test name and path
-- Status: PASS or FAIL
-- Brief description of what was tested
-- Any notable observations or issues
+每次测试后，使用以下内容更新 cookbook 的 `TEST_LOG.md`：
+- 测试名称和路径
+- 状态：PASS 或 FAIL
+- 测试内容的简要描述
+- 任何值得注意的观察或问题
 
-Format:
+格式：
 ```markdown
 ### filename.py
 
 **Status:** PASS/FAIL
 
-**Description:** What the test does and what was observed.
+**Description:** 测试做了什么以及观察到了什么。
 
-**Result:** Summary of success/failure.
+**Result:** 成功/失败摘要。
 
 ---
 ```
 
 ---
 
-## Code Locations
+## 代码位置
 
-| What | Where |
+| 内容 | 位置 |
 |------|-------|
-| Core agent code | `libs/agno/agno/agent/` |
-| Teams | `libs/agno/agno/team/` |
-| Workflows | `libs/agno/agno/workflow/` |
-| Tools | `libs/agno/agno/tools/` |
-| Models | `libs/agno/agno/models/` |
-| Knowledge/RAG | `libs/agno/agno/knowledge/` |
-| Memory | `libs/agno/agno/memory/` |
-| Learning | `libs/agno/agno/learn/` |
-| Database adapters | `libs/agno/agno/db/` |
-| Vector databases | `libs/agno/agno/vectordb/` |
-| Tests | `libs/agno/tests/` |
+| 核心 Agent 代码 | `libs/agno/agno/agent/` |
+| 团队（Teams） | `libs/agno/agno/team/` |
+| 工作流（Workflows） | `libs/agno/agno/workflow/` |
+| 工具（Tools） | `libs/agno/agno/tools/` |
+| 模型（Models） | `libs/agno/agno/models/` |
+| 知识库/RAG | `libs/agno/agno/knowledge/` |
+| 记忆（Memory） | `libs/agno/agno/memory/` |
+| 学习（Learning） | `libs/agno/agno/learn/` |
+| 数据库适配器 | `libs/agno/agno/db/` |
+| 向量数据库 | `libs/agno/agno/vectordb/` |
+| 测试 | `libs/agno/tests/` |
 
 ---
 
-## Coding Patterns
+## 编码模式
 
-See `.cursorrules` for detailed patterns. Key rules:
+详细模式请参见 `.cursorrules`。核心规则：
 
-- **Never create agents in loops** — reuse them for performance
-- **Use output_schema** for structured responses
-- **PostgreSQL in production**, SQLite for dev only
-- **Start with single agent**, scale up only when needed
-- **Both sync and async** — all public methods need both variants
+- **禁止在循环中创建 Agent** — 复用以提升性能
+- **使用 `output_schema`** 获取结构化响应
+- **生产环境使用 PostgreSQL**，SQLite 仅用于开发
+- **从单个 Agent 开始**，只在必要时扩展
+- **同步和异步都要有** — 所有公共方法需要两种变体
 
 ---
 
-## Running Code
+## 运行代码
 
-**Running cookbooks:**
+**运行 cookbook：**
 ```bash
 .venvs/demo/bin/python cookbook/<folder>/<file>.py
 ```
 
-**Running tests:**
+**运行测试：**
 ```bash
 source .venv/bin/activate
 pytest libs/agno/tests/
 
-# Run a specific test file
+# 运行特定测试文件
 pytest libs/agno/tests/unit/test_agent.py
 ```
 
 ---
 
-## When Implementing Features
+## 实现功能时
 
-1. **Check for design doc** in `specs/` — if it exists, follow it
-2. **Look at existing patterns** — find similar code and follow conventions
-3. **Create a cookbook** — every pattern should have an example
-4. **Update implementation.md** — mark what's done
+1. **在 `specs/` 中查找设计文档** — 如果存在，遵循它
+2. **参考现有模式** — 找到类似代码并遵循约定
+3. **创建 cookbook** — 每种模式都应有示例
+4. **更新 implementation.md** — 标记已完成的内容
 
 ---
 
-## Before Submitting Code
+## 提交代码前
 
-**Always run these scripts before pushing code or creating a PR:**
+**推送代码或创建 PR 前，务必运行以下脚本：**
 
 ```bash
-# Activate the virtual environment first
+# 首先激活虚拟环境
 source .venv/bin/activate
 
-# Format all code (ruff format)
+# 格式化所有代码（ruff format）
 ./scripts/format.sh
 
-# Validate all code (ruff check, mypy)
+# 验证所有代码（ruff check、mypy）
 ./scripts/validate.sh
 ```
 
-Both scripts must pass with no errors before code review.
+两个脚本都必须无错误通过才能进行代码审查。
 
-**PR Title Format:**
+**PR 标题格式：**
 
-PR titles must follow one of these formats:
-- `type: description` — e.g., `feat: add workflow serialization`
-- `[type] description` — e.g., `[feat] add workflow serialization`
-- `type-kebab-case` — e.g., `feat-workflow-serialization`
+PR 标题必须遵循以下格式之一：
+- `type: description` — 例如 `feat: add workflow serialization`
+- `[type] description` — 例如 `[feat] add workflow serialization`
+- `type-kebab-case` — 例如 `feat-workflow-serialization`
 
-Valid types: `feat`, `fix`, `cookbook`, `test`, `refactor`, `chore`, `style`, `revert`, `release`
+有效类型：`feat`、`fix`、`cookbook`、`test`、`refactor`、`chore`、`style`、`revert`、`release`
 
-**PR Description:**
+**PR 描述：**
 
-Always follow the PR template in `.github/pull_request_template.md`. Include:
-- Summary of changes
-- Type of change (bug fix, new feature, etc.)
-- Completed checklist items
-- Any additional context
+始终遵循 `.github/pull_request_template.md` 中的 PR 模板。包括：
+- 变更摘要
+- 变更类型（bug 修复、新功能等）
+- 已完成的检查项
+- 任何附加背景信息
 
 ---
 
-## GitHub Operations
+## GitHub 操作
 
-**Updating PR descriptions:**
+**更新 PR 描述：**
 
-The `gh pr edit` command may fail with GraphQL errors related to classic projects. Use the API directly instead:
+`gh pr edit` 命令可能因与 classic projects 相关的 GraphQL 错误而失败。请改用 API 直接操作：
 
 ```bash
-# Update PR body
+# 更新 PR 正文
 gh api repos/agno-agi/agno/pulls/<PR_NUMBER> -X PATCH -f body="<PR_BODY>"
 
-# Or with a file
+# 或使用文件
 gh api repos/agno-agi/agno/pulls/<PR_NUMBER> -X PATCH -f body="$(cat /path/to/body.md)"
 ```
 
 ---
 
-## Don't
+## 禁止事项
 
-- Don't implement features without checking for a design doc first
-- Don't use f-strings for print lines where there are no variables
-- Don't use emojis in examples and print lines
-- Don't skip async variants of public methods
-- Don't push code without running `./scripts/format.sh` and `./scripts/validate.sh`
-- Don't submit a PR without a detailed PR description. Always follow the PR template provided in `.github/pull_request_template.md`.
+- 不要在未查看设计文档的情况下实现功能
+- 不要在没有变量的 print 行中使用 f-string
+- 不要在示例和 print 行中使用表情符号
+- 不要跳过公共方法的 async 变体
+- 不要在未运行 `./scripts/format.sh` 和 `./scripts/validate.sh` 的情况下推送代码
+- 不要在没有详细 PR 描述的情况下提交 PR。始终遵循 `.github/pull_request_template.md` 中提供的 PR 模板。
 
 ---
 
-## CI: Automated Code Review
+## CI：自动化代码审查
 
-Every non-draft PR automatically receives a review from Opus using both `code-review` and `pr-review-toolkit` official plugins (10 specialized agents total). No manual trigger needed — the review posts as a sticky comment on the PR.
+每个非草稿 PR 都会自动收到来自 Opus 的审查，使用 `code-review` 和 `pr-review-toolkit` 官方插件（共 10 个专项 Agent）。无需手动触发——审查会作为置顶评论发布到 PR 上。
 
-When running in GitHub Actions (CI), always end your response with a plain-text summary of findings. Never let the final action be a tool call. If there are no issues, say "No high-confidence findings."
+在 GitHub Actions（CI）中运行时，始终以纯文本摘要作为响应结尾。不要让最终操作是工具调用。如果没有问题，请说 "No high-confidence findings."
 
-Agno-specific checks to always verify:
-- Both sync and async variants exist for all new public methods
-- No agent creation inside loops (agents should be reused)
-- CLAUDE.md coding patterns are followed
-- No f-strings for print lines where there are no variables
+需要始终验证的 Agno 专项检查：
+- 所有新公共方法都存在同步和异步两种变体
+- 循环内没有创建 Agent（Agent 应被复用）
+- 遵循 CLAUDE.md 中的编码模式
+- 没有变量的 print 行中不使用 f-string
