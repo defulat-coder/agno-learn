@@ -1,5 +1,40 @@
 # sql_tools.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Sql Tools
+=============================
+
+Demonstrates sql tools.
+"""
+
+from agno.agent import Agent
+from agno.tools.sql import SQLTools
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+
+db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"
+
+agent = Agent(tools=[SQLTools(db_url=db_url)])
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    agent.print_response(
+        "List the tables in the database. Tell me about contents of one of the tables",
+        markdown=True,
+    )
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/91_tools/sql_tools.py`
 
 ## 概述

@@ -1,5 +1,37 @@
 # tool_use.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""Run `pip install ddgs` to install dependencies."""
+
+from agno.agent import Agent
+from agno.models.azure import AzureOpenAI
+from agno.tools.websearch import WebSearchTools
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=AzureOpenAI(id="gpt-4o-mini"),
+    tools=[WebSearchTools()],
+    markdown=True,
+)
+
+agent.print_response("Whats happening in France?", stream=True)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/azure/openai/tool_use.py`
 
 ## 概述

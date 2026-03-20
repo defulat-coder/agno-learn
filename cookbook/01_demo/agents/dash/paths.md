@@ -1,5 +1,22 @@
 # paths.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""Path constants."""
+
+from pathlib import Path
+
+DASH_DIR = Path(__file__).parent
+KNOWLEDGE_DIR = DASH_DIR / "knowledge"
+TABLES_DIR = KNOWLEDGE_DIR / "tables"
+BUSINESS_DIR = KNOWLEDGE_DIR / "business"
+QUERIES_DIR = KNOWLEDGE_DIR / "queries"
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/01_demo/agents/dash/paths.py`
 
 ## 概述

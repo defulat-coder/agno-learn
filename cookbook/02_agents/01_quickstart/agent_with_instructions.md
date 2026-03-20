@@ -1,5 +1,45 @@
 # agent_with_instructions.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Agent With Instructions
+=============================
+
+Agent With Instructions Quickstart.
+"""
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIResponses
+
+# ---------------------------------------------------------------------------
+# Agent Instructions
+# ---------------------------------------------------------------------------
+instructions = """\
+You are a concise assistant.
+Answer with exactly 3 bullet points when possible.\
+"""
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+agent = Agent(
+    name="Instruction-Tuned Agent",
+    model=OpenAIResponses(id="gpt-5.2"),
+    instructions=instructions,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    agent.print_response("How can I improve my Python debugging workflow?", stream=True)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/02_agents/01_quickstart/agent_with_instructions.py`
 
 ## 概述

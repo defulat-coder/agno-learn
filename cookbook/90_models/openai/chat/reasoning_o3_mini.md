@@ -1,5 +1,43 @@
 # reasoning_o3_mini.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Openai Reasoning O3 Mini
+========================
+
+Cookbook example for `openai/chat/reasoning_o3_mini.py`.
+"""
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
+from agno.tools.yfinance import YFinanceTools
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=OpenAIChat(id="o3-mini", reasoning_effort="high"),
+    tools=[YFinanceTools()],
+    markdown=True,
+)
+
+# Print the response in the terminal
+agent.print_response("Write a report on the NVDA, is it a good buy?", stream=True)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/openai/chat/reasoning_o3_mini.py`
 
 ## 概述

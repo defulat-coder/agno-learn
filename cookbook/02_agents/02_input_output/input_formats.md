@@ -1,5 +1,47 @@
 # input_formats.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Input Formats
+=============================
+
+Input Formats.
+"""
+
+from agno.agent import Agent
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+agent = Agent()
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    agent.print_response(
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What's in this image?"},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                    },
+                },
+            ],
+        },
+        stream=True,
+        markdown=True,
+    )
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/02_agents/02_input_output/input_formats.py`
 
 ## 概述

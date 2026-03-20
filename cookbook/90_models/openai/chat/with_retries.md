@@ -1,5 +1,43 @@
 # with_retries.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Openai With Retries
+===================
+
+Cookbook example for `openai/chat/with_retries.py`.
+"""
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=OpenAIChat(
+        id="gpt-wrong-id",  # Deliberately wrong model ID to trigger retries
+        retries=3,
+        delay_between_retries=1,
+        exponential_backoff=True,
+    ),
+)
+agent.print_response("What is the capital of France?")
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/openai/chat/with_retries.py`
 
 ## 概述

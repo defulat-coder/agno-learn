@@ -1,5 +1,61 @@
 # pdf_input_bytes.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Anthropic Pdf Input Bytes
+=========================
+
+Cookbook example for `anthropic/pdf_input_bytes.py`.
+"""
+
+from pathlib import Path
+
+from agno.agent import Agent
+from agno.media import File
+from agno.models.anthropic import Claude
+from agno.utils.media import download_file
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+pdf_path = Path(__file__).parent.joinpath("ThaiRecipes.pdf")
+
+# Download the file using the download_file function
+download_file(
+    "https://agno-public.s3.amazonaws.com/recipes/ThaiRecipes.pdf", str(pdf_path)
+)
+
+agent = Agent(
+    model=Claude(id="claude-sonnet-4-20250514"),
+    markdown=True,
+)
+
+agent.print_response(
+    "Summarize the contents of the attached file.",
+    files=[
+        File(
+            content=pdf_path.read_bytes(),
+        ),
+    ],
+)
+run_response = agent.get_last_run_output()
+print("Citations:")
+print(run_response.citations)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/anthropic/pdf_input_bytes.py`
 
 ## 概述

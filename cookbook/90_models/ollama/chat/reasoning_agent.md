@@ -1,5 +1,43 @@
 # reasoning_agent.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Ollama Reasoning Agent
+======================
+
+Cookbook example for `ollama/chat/reasoning_agent.py`.
+"""
+
+from agno.agent import Agent
+from agno.models.ollama import Ollama
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+reasoning_agent = Agent(
+    model=Ollama(id="gpt-oss:120b"),
+    reasoning=True,
+    debug_mode=True,
+)
+
+reasoning_agent.print_response(
+    "How many r are in the word 'strawberry'?", show_reasoning=True
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/ollama/chat/reasoning_agent.py`
 
 ## 概述

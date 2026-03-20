@@ -1,5 +1,50 @@
 # searxng_tools.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Searxng Tools
+=============================
+
+Demonstrates searxng tools.
+"""
+
+from agno.agent import Agent
+from agno.tools.searxng import SearxngTools
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+
+# Initialize Searxng with your Searxng instance URL
+searxng = SearxngTools(
+    host="http://localhost:53153",
+    engines=[],
+    fixed_max_results=5,
+    news=True,
+    science=True,
+)
+
+# Create an agent with Searxng
+agent = Agent(tools=[searxng])
+
+# Example: Ask the agent to search using Searxng
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    agent.print_response("""
+    Please search for information about artificial intelligence 
+    and summarize the key points from the top results
+    """)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/91_tools/searxng_tools.py`
 
 ## 概述

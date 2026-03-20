@@ -1,5 +1,22 @@
 # paths.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""Path constants."""
+
+from pathlib import Path
+
+SCOUT_DIR = Path(__file__).parent
+KNOWLEDGE_DIR = SCOUT_DIR / "knowledge"
+SOURCES_DIR = KNOWLEDGE_DIR / "sources"
+ROUTING_DIR = KNOWLEDGE_DIR / "routing"
+PATTERNS_DIR = KNOWLEDGE_DIR / "patterns"
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/01_demo/agents/scout/paths.py`
 
 ## 概述

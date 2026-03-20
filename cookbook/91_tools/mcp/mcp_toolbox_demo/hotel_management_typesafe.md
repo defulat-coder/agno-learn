@@ -1,105 +1,210 @@
 # hotel_management_typesafe.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Hotel Management Typesafe
+=============================
+
+Demonstrates hotel management typesafe.
+"""
+
+import asyncio
+from datetime import date
+from textwrap import dedent
+from typing import List, Literal
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
+from agno.tools.mcp_toolbox import MCPToolbox
+from pydantic import BaseModel, Field
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+
+url = "http://127.0.0.1:5001"
+
+toolsets = ["hotel-management", "booking-system"]
+
+
+class Hotel(BaseModel):
+    id: int = Field(..., description="Unique identifier for the hotel")
+    name: str = Field(..., description="Name of the hotel")
+    location: str = Field(..., description="Location of the hotel")
+    checkin_date: date = Field(..., description="Check-in date for the hotel stay")
+    checkout_date: date = Field(..., description="Check-out date for the hotel stay")
+    price_tier: Literal["Luxury", "Economy", "Boutique", "Extended-Stay"] = Field(
+        description="The hotel tier/category - must be one of: Luxury, Economy, Boutique, or Extended-Stay"
+    )
+    booked: str = Field(
+        description="Indicates if the hotel is booked (bit field from database)"
+    )
+
+
+class HotelSearch(BaseModel):
+    location: str = Field(
+        ...,
+        description="The city, region, or specific location to search for hotels",
+        min_length=1,
+        max_length=100,
+    )
+    tier: Literal["Luxury", "Economy", "Boutique", "Extended-Stay"] = Field(
+        description="The hotel tier/category to search for"
+    )
+
+
+class HotelSearchResult(BaseModel):
+    hotels: List[Hotel] = Field(
+        description="List of hotels matching the search criteria"
+    )
+    total_results: int = Field(description="Total number of hotels found")
+
+
+agent = Agent(
+    tools=[],
+    instructions=dedent(
+        """ \
+        You're a helpful hotel assistant. You handle hotel searching, booking and
+        cancellations. When the user searches for a hotel, mention it's name, id,
+        location and price tier. Always mention hotel ids while performing any
+        searches. This is very important for any operations. For any bookings or
+        cancellations, please provide the appropriate confirmation. Be sure to
+        update checkin or checkout dates if mentioned by the user.
+        Don't ask for confirmations from the user.
+    """
+    ),
+    markdown=True,
+    input_schema=HotelSearch,
+    output_schema=HotelSearchResult,
+    parser_model=OpenAIChat("gpt-5.2"),
+    debug_mode=True,
+    debug_level=2,
+)
+
+
+async def run_agent(hotel_search: HotelSearch) -> None:
+    async with MCPToolbox(url=url, toolsets=toolsets) as tools:
+        agent.tools = [tools]
+        await agent.aprint_response(hotel_search)
+
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    hotel_search = HotelSearch(
+        location="Zurich",
+        tier="Boutique",
+    )
+
+    asyncio.run(run_agent(hotel_search))
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/91_tools/mcp/mcp_toolbox_demo/hotel_management_typesafe.py`
 
 ## 概述
 
 Hotel Management Typesafe
 
-本示例在 Agno cookbook 中的范式归类：**单 Agent**。
+本示例归类：**单 Agent**；模型相关类型：`OpenAIChat`。
 
 **核心配置一览：**
 
 | 配置项 | 值 | 说明 |
 |--------|------|------|
-| `input_schema` | `HotelSearch`（变量） | 来自源码中 `Agent(...)` 字面量或名 |
-| `output_schema` | `HotelSearchResult`（变量） | 来自源码中 `Agent(...)` 字面量或名 |
+| `instructions` | dedent("         You're a helpful hotel assistant. You handle hotel searching, booking and\n        cancellations. When the user searches for a hotel, mention it's name, id,\n        location and price tier. Always mention hotel ids while performing any\n        searches. This is very important for any operations. For any bookings or\n        cancellations, please provide the appropriate confirmation. Be sure to\n        update checkin or checkout dates if mentioned by the user.\n        Don't ask for confirmations from the user.\n    "…) | `Agent(...)` |
+| `markdown` | True | `Agent(...)` |
+| `input_schema` | 变量 `HotelSearch` | `Agent(...)` |
+| `output_schema` | 变量 `HotelSearchResult` | `Agent(...)` |
+| `parser_model` | OpenAIChat('gpt-5.2'…) | `Agent(...)` |
+| `debug_mode` | True | `Agent(...)` |
+| `debug_level` | 2 | `Agent(...)` |
+| （Model 类） | `OpenAIChat` | `agno.models` |
 
 ## 架构分层
 
 ```
-用户/脚本层              Agno 框架层
-┌────────────────┐      ┌─────────────────────────────────┐
-│ hotel_management_typesafe.py │ ──▶ │ get_system_message / run loop     │
-│ （本文件）      │      │ libs/agno/agno/...               │
-└────────────────┘      └─────────────────────────────────┘
-                                │
-                                ▼
-                        ┌──────────────┐
-                        │ Model 适配器  │
-                        └──────────────┘
+用户 / cookbook 示例              Agno 框架
+┌──────────────────────┐         ┌────────────────────────────────┐
+│ hotel_management_typesafe.py │  ──▶  │ Agent → get_run_messages → Model │
+└──────────────────────┘         └────────────────────────────────┘
+                                          │
+                                          ▼
+                                  ┌───────────────┐
+                                  │ 对应 Model 子类 │
+                                  └───────────────┘
 ```
 
 ## 核心组件解析
 
 ### 运行机制与因果链
 
-1. **数据路径**：从本文件入口（`main` / `if __name__` / 路由）进入，经 Agent/Team/Workflow 构造后进入 Agno 运行循环；系统消息由 `get_system_message()` 等组装。
-2. **状态与副作用**：是否使用 `db`、`session_state`、`knowledge` 等请以源码为准；重跑示例可能重复写入会话或存储。
-3. **关键分支**：若存在 `stream=True`、工具调用、人工确认等，均影响运行路径；请对照本 `.py` 中的参数与回调。
-4. **定位**：本文件属于 cookbook 演示代码，用于说明 **单 Agent** 相关用法。
+1. **入口**：从模块 `__main__` 或暴露的 `agent` / `team` 调用进入；同步用 `print_response` / `run`，异步用 `aprint_response` / `arun`（若源码中有）。
+2. **消息**：默认路径下 system 内容由 `get_system_message()`（`libs/agno/agno/agent/_messages.py` 约 **L106** 起）按分段逻辑拼装；若显式传入 `system_message` 则早退使用该字符串。
+3. **模型**：具体 HTTP/SDK 形态以 `libs/agno/agno/models/` 下对应类的 `invoke` / `ainvoke` 为准（勿默认写成单一 `chat.completions`）。
+4. **副作用**：若配置 `db`、`knowledge`、`memory`，运行会读写存储；仅以本文件为准对照。
 
-### 与 System 消息相关的框架锚点
+### 与框架的衔接
 
-- `get_system_message()`：`agno/agent/_messages.py` **L106** 起。
+- **System**：`get_system_message()` 锚点 `agno/agent/_messages.py` **L106+**。
+- **运行**：`Agent.print_response` 等入口 `agno/agent/agent.py`（以当前仓库检索为准）。
 
 ## System Prompt 组装
 
-| 序号 | 组成部分 | 本文件中的值/来源 | 是否生效 |
-|------|---------|-----------------|---------|
-| 1 | `description` / `instructions` 等 | 见上表或源码中 `Agent(...)` | 视赋值而定 |
-| 2 | 默认拼装 | `get_system_message()` 默认路径 | 未显式覆盖 `system_message` 时 |
+| 序号 | 组成部分 | 本文件 | 是否生效 |
+|------|---------|--------|---------|
+| 1 | `instructions` / `description` 等 | 见核心配置表与源码 | 有赋值则生效 |
+| 2 | 默认分段（markdown、时间等） | 取决于 `Agent` 默认与显式参数 | 视参数 |
 
 ### 拼装顺序与源码锚点
 
-1. 若 `agent.system_message` 已提供，优先使用该分支（见 `agno/agent/_messages.py` 文档字符串说明）。
-2. 否则在默认路径下按 `_messages.py` 内分段注释依次合并 `description`、`instructions`、`markdown` 附加段等。
+1. `system_message` 直给 → 使用该内容（见 `_messages.py` 文档字符串分支说明）。
+2. 否则默认拼装：`description`、`role`、`instructions`、markdown 附加段等按 `# 3.x` 注释顺序合并。
 
 ### 还原后的完整 System 文本
 
 ```text
-（请对照本目录下 hotel_management_typesafe.py 中 `Agent` 的字符串字面量自行核对；若为变量拼接或运行时注入，需运行后打印 `get_system_message` 返回值。）
+（主 `Agent(...)` 未传入可静态解析的 `description`/`instructions`/`system_message` 字符串；此时 system 由 `get_system_message()` 默认段与 `markdown` 等开关决定，请在 `agno/agent/_messages.py` 对照分段注释，或在运行中打印 `get_system_message` 返回值。）
 ```
 
 ### 段落释义（模型视角）
 
-- 本批量文档为**骨架级**再生：具体指令句请以源码中的字面量为准。
-- 若含 `instructions`，其约束模型回答风格与任务边界。
+- 指令与安全边界由 `instructions` / `system_message` 约束；若带 `tools` / `knowledge`，文档中需体现「何时检索/调用」由框架注入的提示段支持。
 
 ## 完整 API 请求
 
 ```python
-# 请根据本文件实际使用的 Model 类阅读 libs/agno/agno/models/... 中 invoke/ainvoke，
-# 选择 Chat Completions、Responses 或其他厂商形态；勿默认 chat.completions.create。
-# 下为占位示意：
-# model.invoke(...)  # 或 await model.ainvoke(...)
+# 请以本文件实际 Model 为准打开 libs/agno/agno/models/<厂商>/ 下对应类的 invoke：
+# 可能是 chat.completions.create、responses.create、Gemini generate_content 等。
 ```
 
-> 与第 5 节 system 文本一致：角色名（system/developer）以所用适配器为准。
-
-## Mermaid 流程图
+> 与上一节 system 文本在同一 run 中组合；`developer`/`system` 角色由适配器转换。
 
 ```mermaid
 flowchart TD
-    U["用户/入口<br/>hotel_management_typesafe.py"] --> R["【关键】运行入口<br/>run / main / server"]
-    R --> S["【关键】get_system_message()<br/>见 agno/agent/_messages.py L106"]
-    S --> M["【关键】Model.invoke / response"]
-    M --> Out["输出/流式"]
+    Entry["用户入口<br/>`if __name__` / main"] --> Run["【关键】Agent.run / print_response"]
+    Run --> Sys["【关键】get_system_message<br/>agno/agent/_messages.py L106+"]
+    Sys --> Inv["【关键】Model.invoke / 提供商 API"]
+    Inv --> Out["RunOutput / 流式 chunk"]
 ```
 
 **【关键】节点说明：**
 
-- **运行入口**：对应本示例实际调用 `run` / `print_response` / 服务监听处。
-- **get_system_message**：系统提示拼装的核心函数。
-- **Model.invoke**：发往模型提供商的请求构造与执行。
+- **print_response / run**：用户可见的同步入口。
+- **get_system_message**：系统提示拼装核心。
+- **Model.invoke**：对模型提供商的实际请求。
 
 ## 关键源码文件索引
 
-| 文件 | 关键函数/类 | 作用 |
-|------|------------|------|
-| `agno/agent/_messages.py` | `get_system_message()` L106+ | 默认 system 消息 |
-| `agno/agent/agent.py` | `Agent` | Agent 定义与运行入口 |
-| `agno/models/` | 各 `Model` 子类 | `invoke` / 消息格式 |
-
----
-<!-- 批量重新生成：若需「手写级」精修，请对照本 .py 逐项补全配置表与 System 还原。 -->
+| 文件 | 作用 |
+|------|------|
+| `agno/agent/_messages.py` | `get_system_message()` L106+ |
+| `agno/agent/agent.py` | `Agent` 运行与 CLI 输出 |
+| `agno/models/` | 各厂商 `Model.invoke` |

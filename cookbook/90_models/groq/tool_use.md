@@ -1,5 +1,50 @@
 # tool_use.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""Please install dependencies using:
+uv pip install openai ddgs newspaper4k lxml_html_clean agno
+"""
+
+import asyncio
+
+from agno.agent import Agent
+from agno.models.groq import Groq
+from agno.tools.newspaper4k import Newspaper4kTools
+from agno.tools.websearch import WebSearchTools
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=Groq(id="llama-3.3-70b-versatile"),
+    tools=[WebSearchTools(), Newspaper4kTools()],
+    description="You are a senior NYT researcher writing an article on a topic.",
+    instructions=[
+        "For a given topic, search for the top 5 links.",
+        "Then read each URL and extract the article text, if a URL isn't available, ignore it.",
+        "Analyse and prepare an NYT worthy article based on the information.",
+    ],
+    markdown=True,
+    add_datetime_to_context=True,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    # --- Sync + Streaming ---
+    agent.print_response("Simulation theory", stream=True)
+
+    # --- Async + Streaming ---
+    asyncio.run(agent.aprint_response("Simulation theory", stream=True))
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/groq/tool_use.py`
 
 ## 概述

@@ -1,5 +1,34 @@
 # keyword_search.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+from agno.knowledge.knowledge import Knowledge
+from agno.vectordb.pgvector import PgVector, SearchType
+
+db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"
+
+# Load knowledge base using keyword search
+keyword_db = PgVector(
+    table_name="recipes", db_url=db_url, search_type=SearchType.keyword
+)
+knowledge = Knowledge(
+    name="Keyword Search Knowledge Base",
+    vector_db=keyword_db,
+)
+
+knowledge.insert(
+    url="https://agno-public.s3.amazonaws.com/recipes/ThaiRecipes.pdf",
+)
+
+# Run a keyword-based query
+results = keyword_db.search("chicken coconut soup", limit=5)
+print("Keyword Search Results:", results)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/07_knowledge/09_archive/search_type/keyword_search.py`
 
 ## 概述

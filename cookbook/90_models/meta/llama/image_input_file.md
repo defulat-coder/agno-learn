@@ -1,5 +1,55 @@
 # image_input_file.md — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Meta Image Input File
+=====================
+
+Cookbook example for `meta/llama/image_input_file.py`.
+"""
+
+from pathlib import Path
+
+from agno.agent import Agent
+from agno.media import Image
+from agno.models.meta import Llama
+from agno.utils.media import download_image
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=Llama(id="Llama-4-Maverick-17B-128E-Instruct-FP8"),
+    markdown=True,
+)
+
+image_path = Path(__file__).parent.joinpath("sample.jpg")
+
+download_image(
+    url="https://upload.wikimedia.org/wikipedia/commons/0/0c/GoldenGateBridge-001.jpg",
+    output_path=str(image_path),
+)
+
+agent.print_response(
+    "Tell me about this image?",
+    images=[Image(filepath=image_path)],
+    stream=True,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/meta/llama/image_input_file.py`
 
 ## 概述

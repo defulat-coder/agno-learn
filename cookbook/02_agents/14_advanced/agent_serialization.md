@@ -1,5 +1,51 @@
 # agent_serialization.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Agent Serialization
+=============================
+
+Agent Serialization.
+"""
+
+from agno.agent import Agent
+from agno.db.sqlite import SqliteDb
+from agno.models.openai import OpenAIResponses
+
+# ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
+agent_db = SqliteDb(db_file="tmp/agents.db")
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+agent = Agent(
+    id="serialization-demo-agent",
+    name="Serialization Demo Agent",
+    model=OpenAIResponses(id="gpt-5.2"),
+    db=agent_db,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    config = agent.to_dict()
+    recreated = Agent.from_dict(config)
+
+    version = agent.save()
+    loaded = Agent.load(id=agent.id, db=agent_db, version=version)
+
+    recreated.print_response("Say hello from a recreated agent.", stream=True)
+    loaded.print_response("Say hello from a loaded agent.", stream=True)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/02_agents/14_advanced/agent_serialization.py`
 
 ## 概述

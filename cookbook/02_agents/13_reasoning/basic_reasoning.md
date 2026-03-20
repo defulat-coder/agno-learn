@@ -1,5 +1,44 @@
 # basic_reasoning.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Basic Reasoning
+=============================
+
+Basic Reasoning.
+"""
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIResponses
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+reasoning_agent = Agent(
+    name="Reasoning Agent",
+    model=OpenAIResponses(id="gpt-5.2"),
+    reasoning=True,
+    reasoning_min_steps=2,
+    reasoning_max_steps=6,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    reasoning_agent.print_response(
+        "A bat and ball cost $1.10 total. The bat costs $1.00 more than the ball."
+        " How much does the ball cost?",
+        stream=True,
+        show_full_reasoning=True,
+    )
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/02_agents/13_reasoning/basic_reasoning.py`
 
 ## 概述

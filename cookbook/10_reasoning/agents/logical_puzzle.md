@@ -1,5 +1,55 @@
 # logical_puzzle.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Missionaries And Cannibals Puzzle
+=================================
+
+Demonstrates built-in and DeepSeek-backed reasoning for logic puzzle solving.
+"""
+
+from agno.agent import Agent
+from agno.models.deepseek import DeepSeek
+from agno.models.openai import OpenAIChat
+
+# ---------------------------------------------------------------------------
+# Create Agents
+# ---------------------------------------------------------------------------
+task = (
+    "Three missionaries and three cannibals need to cross a river. "
+    "They have a boat that can carry up to two people at a time. "
+    "If, at any time, the cannibals outnumber the missionaries on either side of the river, the cannibals will eat the missionaries. "
+    "How can all six people get across the river safely? Provide a step-by-step solution and show the solutions as an ascii diagram"
+)
+
+cot_agent = Agent(
+    model=OpenAIChat(id="gpt-4o"),
+    reasoning=True,
+    markdown=True,
+)
+
+deepseek_agent = Agent(
+    model=OpenAIChat(id="gpt-4o"),
+    reasoning_model=DeepSeek(id="deepseek-reasoner"),
+    markdown=True,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agents
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    print("=== Built-in Chain Of Thought ===")
+    cot_agent.print_response(task, stream=True, show_full_reasoning=True)
+
+    print("\n=== DeepSeek Reasoning Model ===")
+    deepseek_agent.print_response(task, stream=True, show_full_reasoning=True)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/10_reasoning/agents/logical_puzzle.py`
 
 ## 概述

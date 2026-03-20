@@ -1,5 +1,53 @@
 # finance_agent.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Groq Finance Agent
+==================
+
+Cookbook example for `groq/reasoning/finance_agent.py`.
+"""
+
+from agno.agent import Agent
+from agno.models.groq import Groq
+from agno.tools.yfinance import YFinanceTools
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+# Create an Agent with Groq and YFinanceTools
+finance_agent = Agent(
+    model=Groq(id="deepseek-r1-distill-llama-70b-specdec"),
+    tools=[YFinanceTools()],
+    description="You are an investment analyst with deep expertise in market analysis",
+    instructions=[
+        "Use tables to display data where possible.",
+        "Always call the tool before you answer.",
+    ],
+    add_datetime_to_context=True,
+    markdown=True,
+)
+
+# Example usage
+finance_agent.print_response(
+    "Write a report on NVDA with stock price, analyst recommendations, and stock fundamentals.",
+    stream=True,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/groq/reasoning/finance_agent.py`
 
 ## 概述

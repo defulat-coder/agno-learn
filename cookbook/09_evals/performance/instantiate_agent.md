@@ -1,5 +1,43 @@
 # instantiate_agent.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Agent Instantiation Performance Evaluation
+==========================================
+
+Demonstrates measuring agent instantiation performance.
+"""
+
+from agno.agent import Agent
+from agno.eval.performance import PerformanceEval
+
+
+# ---------------------------------------------------------------------------
+# Create Benchmark Function
+# ---------------------------------------------------------------------------
+def instantiate_agent():
+    return Agent(system_message="Be concise, reply with one sentence.")
+
+
+# ---------------------------------------------------------------------------
+# Create Evaluation
+# ---------------------------------------------------------------------------
+instantiation_perf = PerformanceEval(
+    name="Instantiation Performance", func=instantiate_agent, num_iterations=1000
+)
+
+# ---------------------------------------------------------------------------
+# Run Evaluation
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    instantiation_perf.run(print_results=True, print_summary=True)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/09_evals/performance/instantiate_agent.py`
 
 ## 概述

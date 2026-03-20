@@ -1,5 +1,42 @@
 # llama_essay_writer.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Huggingface Llama Essay Writer
+==============================
+
+Cookbook example for `huggingface/llama_essay_writer.py`.
+"""
+
+from agno.agent import Agent
+from agno.models.huggingface import HuggingFace
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=HuggingFace(
+        id="openai/gpt-oss-120b",
+        max_tokens=4096,
+    ),
+    description="You are an essay writer. Write a 300 words essay on topic that will be provided by user",
+)
+agent.print_response("topic: AI")
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/huggingface/llama_essay_writer.py`
 
 ## 概述

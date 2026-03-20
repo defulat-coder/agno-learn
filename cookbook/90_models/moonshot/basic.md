@@ -1,5 +1,38 @@
 # basic.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Moonshot Basic
+==============
+
+Cookbook example for `moonshot/basic.py`.
+"""
+
+from agno.agent import Agent
+from agno.models.moonshot import MoonShot
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(model=MoonShot(id="kimi-k2-thinking"), markdown=True)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    # --- Sync ---
+    agent.print_response("Share a 2 sentence horror story.")
+
+    # --- Sync + Streaming ---
+    agent.print_response("Share a 2 sentence horror story.", stream=True)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/moonshot/basic.py`
 
 ## 概述

@@ -1,5 +1,43 @@
 # tool_use_gpt_5.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Openai Tool Use Gpt 5
+=====================
+
+Cookbook example for `openai/responses/tool_use_gpt_5.py`.
+"""
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIResponses
+from agno.tools.yfinance import YFinanceTools
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=OpenAIResponses(id="gpt-5"),
+    tools=[YFinanceTools(cache_results=True)],
+    markdown=True,
+    telemetry=False,
+)
+
+agent.print_response("What is the current price of TSLA?", stream=True)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/openai/responses/tool_use_gpt_5.py`
 
 ## 概述

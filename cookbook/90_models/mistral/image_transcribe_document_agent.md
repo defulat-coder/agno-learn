@@ -1,5 +1,43 @@
 # image_transcribe_document_agent.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+This agent transcribes an old written document from an image.
+"""
+
+from agno.agent import Agent
+from agno.media import Image
+from agno.models.mistral.mistral import MistralChat
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=MistralChat(id="pixtral-12b-2409"),
+    markdown=True,
+)
+
+agent.print_response(
+    "Transcribe this document.",
+    images=[
+        Image(url="https://ciir.cs.umass.edu/irdemo/hw-demo/page_example.jpg"),
+    ],
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/mistral/image_transcribe_document_agent.py`
 
 ## 概述

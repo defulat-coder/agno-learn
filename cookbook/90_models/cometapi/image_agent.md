@@ -1,5 +1,47 @@
 # image_agent.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Image analysis example using CometAPI with vision models.
+"""
+
+from agno.agent import Agent
+from agno.media import Image
+from agno.models.cometapi import CometAPI
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+# Use a vision-capable model from CometAPI
+agent = Agent(
+    model=CometAPI(id="gpt-4o"),  # GPT-4o has vision capabilities
+    markdown=True,
+)
+
+agent.print_response(
+    "Describe this image in detail and tell me what you can see",
+    images=[
+        Image(
+            url="https://httpbin.org/image/png"  # Reliable test image
+        )
+    ],
+    stream=True,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/cometapi/image_agent.py`
 
 ## 概述

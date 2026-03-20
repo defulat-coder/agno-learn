@@ -1,5 +1,38 @@
 # output_schema.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Output Schema
+=============================
+
+This example shows how to use the output_model parameter to specify the model that will be used to generate the final response.
+"""
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIResponses
+from agno.tools.websearch import WebSearchTools
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+agent = Agent(
+    model=OpenAIResponses(id="gpt-5.2"),
+    output_model=OpenAIResponses(id="gpt-5-mini"),
+    tools=[WebSearchTools()],
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    agent.print_response("Latest news from France?", stream=True)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/02_agents/02_input_output/output_schema.py`
 
 > 注意：文件头注释误写为 output_model；源码实际使用 **`output_model=OpenAIResponses(gpt-5-mini)`** 作为**另一模型**，与 `output_schema` 参数不同，请以代码为准。

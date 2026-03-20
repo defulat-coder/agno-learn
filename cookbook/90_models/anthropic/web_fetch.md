@@ -1,5 +1,50 @@
 # web_fetch.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Anthropic Web Fetch
+===================
+
+Cookbook example for `anthropic/web_fetch.py`.
+"""
+
+from agno.agent import Agent
+from agno.models.anthropic import Claude
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=Claude(id="claude-opus-4-5", betas=["web-fetch-2025-09-10"]),
+    tools=[
+        {
+            "type": "web_fetch_20250910",
+            "name": "web_fetch",
+            "max_uses": 5,
+        }
+    ],
+    markdown=True,
+)
+
+agent.print_response(
+    "Tell me more about https://en.wikipedia.org/wiki/Glacier_National_Park_(U.S.)",
+    stream=True,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/anthropic/web_fetch.py`
 
 ## 概述

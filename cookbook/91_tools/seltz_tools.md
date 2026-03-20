@@ -1,5 +1,42 @@
 # seltz_tools.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""Seltz Tools Example.
+
+Run `pip install seltz agno openai python-dotenv` to install dependencies.
+"""
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIResponses
+from agno.tools.seltz import SeltzTools
+from dotenv import load_dotenv
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+
+load_dotenv()
+
+agent = Agent(
+    model=OpenAIResponses(id="gpt-5.2"),
+    tools=[SeltzTools(show_results=True)],
+    markdown=True,
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    agent.print_response("Search for current AI safety reports", markdown=True)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/91_tools/seltz_tools.py`
 
 ## 概述

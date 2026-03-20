@@ -1,5 +1,53 @@
 # image_agent_with_memory.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Aimlapi Image Agent With Memory
+===============================
+
+Cookbook example for `aimlapi/image_agent_with_memory.py`.
+"""
+
+from agno.agent import Agent
+from agno.media import Image
+from agno.models.aimlapi import AIMLAPI
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=AIMLAPI(id="meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo"),
+    markdown=True,
+    add_history_to_context=True,
+    num_history_runs=3,
+)
+
+agent.print_response(
+    "Tell me about this image",
+    images=[
+        Image(
+            url="https://upload.wikimedia.org/wikipedia/commons/0/0c/GoldenGateBridge-001.jpg"
+        )
+    ],
+    stream=True,
+)
+
+agent.print_response("Tell me where I can get more images?")
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/aimlapi/image_agent_with_memory.py`
 
 ## 概述

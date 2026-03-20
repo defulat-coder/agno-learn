@@ -1,5 +1,35 @@
 # shell_tools.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Shell Tools
+=============================
+
+Demonstrates shell tools.
+"""
+
+from agno.agent import Agent
+from agno.tools.shell import ShellTools
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+
+agent = Agent(tools=[ShellTools()])
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    agent.print_response("Show me the contents of the current directory", markdown=True)
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/91_tools/shell_tools.py`
 
 ## 概述

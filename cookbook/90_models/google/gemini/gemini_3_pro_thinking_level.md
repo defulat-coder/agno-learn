@@ -1,5 +1,39 @@
 # gemini_3_pro_thinking_level.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Async example using Gemini with tool calls.
+"""
+
+import asyncio
+
+from agno.agent import Agent
+from agno.models.google import Gemini
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=Gemini(id="gemini-3-pro-preview", thinking_level="low"),
+    markdown=True,
+)
+
+asyncio.run(agent.aprint_response("Whats the current news in France?", stream=True))
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/google/gemini/gemini_3_pro_thinking_level.py`
 
 ## 概述

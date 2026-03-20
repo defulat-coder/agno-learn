@@ -1,5 +1,52 @@
 # imagen_tool.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""Example: Using the GeminiTools Toolkit for Image Generation
+
+Make sure you have set the GOOGLE_API_KEY environment variable.
+Example prompts to try:
+- "Create a surreal painting of a floating city in the clouds at sunset"
+- "Generate a photorealistic image of a cozy coffee shop interior"
+- "Design a cute cartoon mascot for a tech startup, vector style"
+- "Create an artistic portrait of a cyberpunk samurai in a rainy city"
+
+Run `uv pip install google-genai agno` to install the necessary dependencies.
+"""
+
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
+from agno.tools.models.gemini import GeminiTools
+from agno.utils.media import save_base64_data
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+
+agent = Agent(
+    model=OpenAIChat(id="gpt-4o"),
+    tools=[GeminiTools()],
+)
+
+agent.print_response(
+    "Create an artistic portrait of a cyberpunk samurai in a rainy city",
+)
+response = agent.run_response
+if response and response.images:
+    save_base64_data(str(response.images[0].content), "tmp/cyberpunk_samurai.png")
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    pass
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/90_models/google/gemini/imagen_tool.py`
 
 ## 概述

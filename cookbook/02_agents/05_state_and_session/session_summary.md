@@ -1,5 +1,63 @@
 # session_summary.py — 实现原理分析
 
+<!-- cookbook-py-source:start -->
+## 完整源码
+
+```python
+"""
+Session Summary
+=============================
+
+This example shows how to use the session summary to store the conversation summary.
+"""
+
+from agno.agent.agent import Agent
+from agno.db.postgres import PostgresDb
+from agno.models.openai import OpenAIResponses
+from agno.session.summary import SessionSummaryManager  # noqa: F401
+
+db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"
+
+db = PostgresDb(db_url=db_url, session_table="sessions")
+
+# Method 1: Set enable_session_summaries to True
+
+# ---------------------------------------------------------------------------
+# Create Agent
+# ---------------------------------------------------------------------------
+agent = Agent(
+    model=OpenAIResponses(id="gpt-5-mini"),
+    db=db,
+    enable_session_summaries=True,
+    session_id="session_123",
+)
+
+# ---------------------------------------------------------------------------
+# Run Agent
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    agent.print_response("Hi my name is John and I live in New York")
+    agent.print_response("I like to play basketball and hike in the mountains")
+
+    print(agent.get_session_summary(session_id="session_123"))
+
+    # Method 2: Set session_summary_manager
+
+    # session_summary_manager = SessionSummaryManager(model=OpenAIResponses(id="gpt-5-mini"))
+
+    # agent = Agent(
+    #     model=OpenAIResponses(id="gpt-5-mini"),
+    #     db=db,
+    #     session_id="session_summary",
+    #     session_summary_manager=session_summary_manager,
+    # )
+
+    # agent.print_response("Hi my name is John and I live in New York")
+    # agent.print_response("I like to play basketball and hike in the mountains")
+```
+
+<!-- cookbook-py-source:end -->
+
 > 源文件：`cookbook/02_agents/05_state_and_session/session_summary.py`
 
 ## 概述
