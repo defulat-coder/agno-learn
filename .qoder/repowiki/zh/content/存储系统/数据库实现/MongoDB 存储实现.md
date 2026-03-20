@@ -7,12 +7,20 @@
 - [utils.py](file://libs/agno/agno/db/mongo/utils.py)
 - [schemas.py](file://libs/agno/agno/db/mongo/schemas.py)
 - [base.py](file://libs/agno/agno/db/base.py)
+- [__init__.py](file://libs/agno/agno/db/mongo/__init__.py)
 - [mongodb_for_agent.py](file://cookbook/06_storage/mongo/mongodb_for_agent.py)
 - [async_mongodb_for_agent.py](file://cookbook/06_storage/mongo/async_mongo/async_mongodb_for_agent.py)
 - [async_mongodb_for_team.py](file://cookbook/06_storage/mongo/async_mongo/async_mongodb_for_team.py)
 - [mongo.py](file://cookbook/05_agent_os/dbs/mongo.py)
 - [run_mongodb.sh](file://cookbook/scripts/run_mongodb.sh)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 修复了PyMongo异步模块的错误导入问题，解决了ImportError异常
+- 增强了异步客户端的兼容性检测和错误处理机制
+- 改进了Motor和PyMongo异步客户端的导入保护
+- 优化了客户端类型检测逻辑，提高了稳定性
 
 ## 目录
 1. [简介](#简介)
@@ -29,6 +37,8 @@
 
 Agno Learn 项目中的 MongoDB 存储实现提供了灵活的文档数据库解决方案，支持同步和异步两种操作模式。该实现充分利用了 MongoDB 的 BSON 文档存储特性，为代理会话、团队协作、工作流执行等场景提供了高效的数据持久化能力。
 
+**最新修复**：本次更新重点解决了PyMongo异步模块的错误导入问题，通过增强的异常处理和客户端类型检测机制，确保了在不同环境下的稳定运行。
+
 MongoDB 在 Agno Learn 中的应用展现了现代文档数据库的核心优势：灵活的数据模型、水平扩展能力、丰富的查询语言以及强大的聚合功能。通过合理的集合设计和索引策略，系统能够支持大规模的并发访问和复杂的数据检索需求。
 
 ## 项目结构
@@ -42,9 +52,11 @@ MongoDb[MongoDb 同步类]
 AsyncMongoDb[AsyncMongoDb 异步类]
 Utils[工具函数模块]
 Schemas[集合模式定义]
+Init[__init__ 模块]
 end
 subgraph "基础接口层"
 BaseDb[BaseDb 抽象基类]
+AsyncBaseDb[AsyncBaseDb 抽象基类]
 end
 subgraph "Cookbook 示例"
 SyncExample[同步示例]
@@ -52,11 +64,13 @@ AsyncExample[异步示例]
 AgentOSExample[AgentOS 示例]
 end
 MongoDb --> BaseDb
-AsyncMongoDb --> BaseDb
+AsyncMongoDb --> AsyncBaseDb
 MongoDb --> Utils
 AsyncMongoDb --> Utils
 MongoDb --> Schemas
 AsyncMongoDb --> Schemas
+Init --> MongoDb
+Init --> AsyncMongoDb
 SyncExample --> MongoDb
 AsyncExample --> AsyncMongoDb
 AgentOSExample --> MongoDb
@@ -67,6 +81,7 @@ AgentOSExample --> AsyncMongoDb
 - [mongo.py:48-127](file://libs/agno/agno/db/mongo/mongo.py#L48-L127)
 - [async_mongo.py:138-232](file://libs/agno/agno/db/mongo/async_mongo.py#L138-L232)
 - [base.py:30-137](file://libs/agno/agno/db/base.py#L30-L137)
+- [__init__.py:1-17](file://libs/agno/agno/db/mongo/__init__.py#L1-L17)
 
 **章节来源**
 - [mongo.py:1-100](file://libs/agno/agno/db/mongo/mongo.py#L1-L100)
@@ -93,12 +108,15 @@ MongoDb 类是 Agno Learn 中 MongoDB 存储的核心实现，提供了完整的
 
 AsyncMongoDb 类提供了基于 Motor 和 PyMongo 异步客户端的异步数据库操作能力。该类支持事件循环感知的客户端管理，确保在多线程和异步环境中正确运行。
 
+**最新修复**：增强了异步客户端的导入保护机制，解决了ImportError异常问题，提高了在不同Python环境下的兼容性。
+
 **主要特性：**
 - 支持 Motor 和 PyMongo 两种异步客户端
 - 事件循环感知的客户端管理
 - 异步集合操作和索引创建
 - 完整的异步 CRUD 操作
 - 自动客户端类型检测
+- 增强的错误处理和异常恢复
 
 **章节来源**
 - [async_mongo.py:138-232](file://libs/agno/agno/db/mongo/async_mongo.py#L138-L232)
@@ -126,6 +144,26 @@ MongoDB 存储实现采用了清晰的分层架构设计，确保了代码的可
 ```mermaid
 classDiagram
 class BaseDb {
+<<abstract>>
++id : str
++session_table_name : str
++memory_table_name : str
++metrics_table_name : str
++eval_table_name : str
++knowledge_table_name : str
++trace_table_name : str
++span_table_name : str
++table_exists(table_name) bool
++close() void
++delete_session()*
++get_session()*
++upsert_session()*
++get_sessions()*
++delete_sessions()*
++rename_session()*
++upsert_sessions()*
+}
+class AsyncBaseDb {
 <<abstract>>
 +id : str
 +session_table_name : str
@@ -202,7 +240,7 @@ class Schemas {
 +get_collection_indexes(type) List
 }
 BaseDb <|-- MongoDb
-BaseDb <|-- AsyncMongoDb
+AsyncBaseDb <|-- AsyncMongoDb
 MongoDb --> Utils : uses
 AsyncMongoDb --> Utils : uses
 MongoDb --> Schemas : uses
@@ -428,6 +466,32 @@ MongoDB 存储实现支持高效的批量操作和事务处理：
 - [mongo.py:731-790](file://libs/agno/agno/db/mongo/mongo.py#L731-L790)
 - [async_mongo.py:739-800](file://libs/agno/agno/db/mongo/async_mongo.py#L739-L800)
 
+### 异步客户端导入保护机制
+
+**最新增强功能**：为了防止ImportError异常，AsyncMongoDb类现在包含了完善的导入保护机制：
+
+```mermaid
+flowchart TD
+A[启动异步客户端] --> B{检测 Motor 安装}
+C[Motor 可用] --> D[导入 AsyncIOMotorClient]
+E[Motor 不可用] --> F[设置 MOTOR_AVAILABLE = False]
+D --> G{检测 PyMongo 异步安装}
+F --> G
+G --> H{PyMongo 异步可用}
+I[PyMongo 异步可用] --> J[导入 AsyncMongoClient]
+K[PyMongo 异步不可用] --> L[设置 PYMONGO_ASYNC_AVAILABLE = False]
+J --> M{至少一个客户端可用?}
+L --> M
+M --> N{可用} --> O[继续初始化]
+M --> P{不可用} --> Q[抛出 ImportError]
+```
+
+**图表来源**
+- [async_mongo.py:36-71](file://libs/agno/agno/db/mongo/async_mongo.py#L36-L71)
+
+**章节来源**
+- [async_mongo.py:36-71](file://libs/agno/agno/db/mongo/async_mongo.py#L36-L71)
+
 ## 依赖关系分析
 
 MongoDB 存储实现具有清晰的依赖关系结构，确保了模块间的松耦合：
@@ -438,13 +502,16 @@ subgraph "外部依赖"
 PyMongo[PyMongo 库]
 Motor[Motor 库]
 BSON[BSON 编码]
+Metadata[驱动元数据]
 end
 subgraph "内部模块"
 BaseDb[BaseDb 抽象基类]
+AsyncBaseDb[AsyncBaseDb 抽象基类]
 MongoDb[MongoDb 实现]
 AsyncMongoDb[AsyncMongoDb 实现]
 Utils[工具函数]
 Schemas[集合模式]
+Init[__init__ 模块]
 end
 subgraph "应用层"
 Agent[代理]
@@ -456,12 +523,15 @@ PyMongo --> MongoDb
 Motor --> AsyncMongoDb
 BSON --> MongoDb
 BSON --> AsyncMongoDb
+Metadata --> MongoDb
 BaseDb --> MongoDb
-BaseDb --> AsyncMongoDb
+AsyncBaseDb --> AsyncMongoDb
 Utils --> MongoDb
 Utils --> AsyncMongoDb
 Schemas --> MongoDb
 Schemas --> AsyncMongoDb
+Init --> MongoDb
+Init --> AsyncMongoDb
 MongoDb --> Agent
 MongoDb --> Team
 MongoDb --> Workflow
@@ -476,6 +546,7 @@ AsyncMongoDb --> AgentOS
 - [mongo.py:36-44](file://libs/agno/agno/db/mongo/mongo.py#L36-L44)
 - [async_mongo.py:36-44](file://libs/agno/agno/db/mongo/async_mongo.py#L36-L44)
 - [base.py:30-137](file://libs/agno/agno/db/base.py#L30-L137)
+- [__init__.py:1-17](file://libs/agno/agno/db/mongo/__init__.py#L1-L17)
 
 **章节来源**
 - [mongo.py:1-50](file://libs/agno/agno/db/mongo/mongo.py#L1-L50)
@@ -524,6 +595,16 @@ MongoDB 存储实现提供了高效的连接池管理机制：
 - 基于访问频率的LRU淘汰
 - 写操作触发的缓存更新
 
+### 异步客户端类型检测优化
+
+**增强的客户端检测机制**：
+- 支持多种客户端类型检测方法
+- 包含类型检查、字符串匹配和模块名检查
+- 提供降级处理机制
+
+**章节来源**
+- [async_mongo.py:100-135](file://libs/agno/agno/db/mongo/async_mongo.py#L100-L135)
+
 ## 故障排除指南
 
 ### 常见连接问题
@@ -537,6 +618,11 @@ MongoDB 存储实现提供了高效的连接池管理机制：
 - 确认用户名和密码正确性
 - 验证用户权限配置
 - 检查数据库访问控制设置
+
+**ImportError 异常处理**：
+- 确保安装了正确的依赖包
+- 检查 Python 版本兼容性
+- 验证虚拟环境配置
 
 **章节来源**
 - [run_mongodb.sh:1-6](file://cookbook/scripts/run_mongodb.sh#L1-L6)
@@ -552,6 +638,11 @@ MongoDB 存储实现提供了高效的连接池管理机制：
 - 调整集合预分配策略
 - 优化文档大小和结构
 - 实施适当的分片策略
+
+**异步客户端兼容性问题**：
+- 检查 Motor 和 PyMongo 的版本兼容性
+- 验证事件循环的正确使用
+- 确认客户端类型检测逻辑
 
 **章节来源**
 - [mongo.py:119-127](file://libs/agno/agno/db/mongo/mongo.py#L119-L127)
@@ -569,6 +660,11 @@ MongoDB 存储实现提供了高效的连接池管理机制：
 - 使用数据库约束保证数据质量
 - 定期执行数据一致性检查
 
+**异步操作同步问题**：
+- 确保事件循环的正确管理
+- 验证客户端生命周期
+- 检查连接池的状态
+
 **章节来源**
 - [mongo.py:646-648](file://libs/agno/agno/db/mongo/mongo.py#L646-L648)
 - [async_mongo.py:779-786](file://libs/agno/agno/db/mongo/async_mongo.py#L779-L786)
@@ -577,16 +673,20 @@ MongoDB 存储实现提供了高效的连接池管理机制：
 
 Agno Learn 项目中的 MongoDB 存储实现展现了现代文档数据库的最佳实践。通过精心设计的集合结构、完善的索引策略、高效的异步操作能力和全面的性能优化措施，该实现为代理系统提供了可靠的数据持久化解决方案。
 
+**最新改进**：本次更新重点加强了异步客户端的导入保护机制，通过增强的异常处理和客户端类型检测，显著提高了系统的稳定性和兼容性。新的导入保护机制能够优雅地处理不同环境下的依赖缺失问题，确保应用在各种部署环境中都能正常运行。
+
 **主要优势：**
 - 灵活的文档模型适应代理系统的多样化需求
 - 高效的异步操作支持大规模并发访问
 - 完善的索引和查询优化确保良好的性能表现
 - 清晰的架构设计便于维护和扩展
+- 增强的导入保护机制提高系统稳定性
 
 **未来改进方向：**
 - 实施更精细的分片策略支持更大规模数据
 - 优化批量操作的性能和可靠性
 - 增强监控和诊断工具
 - 提供更多的配置选项和调优参数
+- 进一步完善异步客户端的兼容性检测
 
 该实现为基于 MongoDB 的代理系统开发提供了坚实的基础，能够满足从原型开发到生产环境的各种需求。

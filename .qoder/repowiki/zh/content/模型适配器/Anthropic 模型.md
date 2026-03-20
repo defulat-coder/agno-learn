@@ -10,7 +10,17 @@
 - [libs/agno/tests/unit/models/aws/test_claude_client.py](file://libs/agno/tests/unit/models/aws/test_claude_client.py)
 - [libs/agno/tests/unit/utils/test_claude.py](file://libs/agno/tests/unit/utils/test_claude.py)
 - [cookbook/08_learning/06_quick_tests/04_claude_model.py](file://cookbook/08_learning/06_quick_tests/04_claude_model.py)
+- [libs/agno/tests/unit/models/anthropic/test_structured_output_capability.py](file://libs/agno/tests/unit/models/anthropic/test_structured_output_capability.py)
+- [cookbook/90_models/anthropic/structured_output.py](file://cookbook/90_models/anthropic/structured_output.py)
+- [cookbook/90_models/anthropic/structured_output_strict_tools.py](file://cookbook/90_models/anthropic/structured_output_strict_tools.py)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 更新了 Claude 模型结构化输出能力检测机制，从脆弱的 blocklist 方法改为更稳健的 prefix-based 检测系统
+- 新增了 NON_STRUCTURED_OUTPUT_PREFIXES 和 NON_STRUCTURED_OUTPUT_ALIASES 常量定义
+- 改进了结构化输出支持的判断逻辑，采用更精确的前缀匹配和别名检测
+- 更新了相关测试用例以验证新的检测机制
 
 ## 目录
 1. [简介](#简介)
@@ -35,7 +45,7 @@
 - 实际案例与故障排除：环境变量、凭证轮换、错误处理。
 
 ## 项目结构
-Agno Learn 将 Claude 集成拆分为“模型适配层”“工具层”“推理辅助层”，并提供 AWS Bedrock 与 VertexAI 两种托管通道的 Claude 子类，便于在不同运行环境中选择。
+Agno Learn 将 Claude 集成拆分为"模型适配层""工具层""推理辅助层"，并提供 AWS Bedrock 与 VertexAI 两种托管通道的 Claude 子类，便于在不同运行环境中选择。
 
 ```mermaid
 graph TB
@@ -57,14 +67,14 @@ B --> D
 C --> D
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/anthropic/claude.py:66-142](file://libs/agno/agno/models/anthropic/claude.py#L66-L142)
 - [libs/agno/agno/models/aws/claude.py:24-54](file://libs/agno/agno/models/aws/claude.py#L24-L54)
 - [libs/agno/agno/models/vertexai/claude.py:19-47](file://libs/agno/agno/models/vertexai/claude.py#L19-L47)
 - [libs/agno/agno/utils/models/claude.py:265-366](file://libs/agno/agno/utils/models/claude.py#L265-L366)
 - [libs/agno/agno/reasoning/anthropic.py:13-26](file://libs/agno/agno/reasoning/anthropic.py#L13-L26)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/anthropic/claude.py:66-142](file://libs/agno/agno/models/anthropic/claude.py#L66-L142)
 - [libs/agno/agno/utils/models/claude.py:265-366](file://libs/agno/agno/utils/models/claude.py#L265-L366)
 - [libs/agno/agno/reasoning/anthropic.py:13-26](file://libs/agno/agno/reasoning/anthropic.py#L13-L26)
@@ -76,7 +86,7 @@ C --> D
 - 工具与消息格式化：将通用消息与工具定义转换为 Anthropic API 所需格式，支持严格模式与结构化输出 Schema。
 - 推理辅助：识别与封装 Claude 的扩展思考能力，支持同步与异步流式推理。
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/anthropic/claude.py:66-142](file://libs/agno/agno/models/anthropic/claude.py#L66-L142)
 - [libs/agno/agno/models/aws/claude.py:24-54](file://libs/agno/agno/models/aws/claude.py#L24-L54)
 - [libs/agno/agno/models/vertexai/claude.py:19-47](file://libs/agno/agno/models/vertexai/claude.py#L19-L47)
@@ -107,11 +117,11 @@ Anth-->>Model : "原始响应/增量块"
 Model-->>App : "ModelResponse/增量响应"
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/anthropic/claude.py:582-700](file://libs/agno/agno/models/anthropic/claude.py#L582-L700)
 - [libs/agno/agno/utils/models/claude.py:265-366](file://libs/agno/agno/utils/models/claude.py#L265-L366)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/anthropic/claude.py:582-700](file://libs/agno/agno/models/anthropic/claude.py#L582-L700)
 - [libs/agno/agno/utils/models/claude.py:265-366](file://libs/agno/agno/utils/models/claude.py#L265-L366)
 
@@ -120,7 +130,7 @@ Model-->>App : "ModelResponse/增量响应"
 ### Claude 模型适配器（Anthropic）
 - 支持的模型与特性
   - 扩展思考（Extended Thinking）黑名单：包含特定 Haiku 与部分 3.5 Haiku 模型。
-  - 原生结构化输出支持：对 3.x 与部分 4.x 前期版本不支持，其余默认支持。
+  - 原生结构化输出支持：采用更稳健的 prefix-based 检测系统，使用 NON_STRUCTURED_OUTPUT_PREFIXES 和 NON_STRUCTURED_OUTPUT_ALIASES 常量进行精确判断。
 - 配置项
   - 基础参数：max_tokens、temperature、stop_sequences、top_p、top_k。
   - 扩展参数：thinking（启用扩展思考）、cache_system_prompt、extended_cache_time。
@@ -135,6 +145,8 @@ Model-->>App : "ModelResponse/增量响应"
   - 文本内容、思考块、工具调用、引用（URL/文档）、结构化输出（JSON 解析与 Pydantic 校验）、用量指标、上下文管理信息、文件 ID（技能场景）。
 - 流式处理
   - 支持 ContentBlockDeltaEvent/BetaRawContentBlockDeltaEvent 等增量事件，避免重复内容拼接，支持结构化输出的流式解析。
+
+**更新** 结构化输出能力检测机制已从脆弱的 blocklist 方法改进为更稳健的 prefix-based 检测系统，使用 NON_STRUCTURED_OUTPUT_PREFIXES 和 NON_STRUCTURED_OUTPUT_ALIASES 常量进行精确判断。
 
 ```mermaid
 classDiagram
@@ -160,6 +172,8 @@ class Claude {
 +http_client : httpx.Client/AsyncClient
 +client_params : dict
 +default_headers : dict
++NON_STRUCTURED_OUTPUT_PREFIXES : tuple
++NON_STRUCTURED_OUTPUT_ALIASES : dict
 +get_client()
 +get_async_client()
 +invoke(...)
@@ -174,13 +188,13 @@ class Claude {
 }
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/anthropic/claude.py:66-142](file://libs/agno/agno/models/anthropic/claude.py#L66-L142)
 - [libs/agno/agno/models/anthropic/claude.py:582-700](file://libs/agno/agno/models/anthropic/claude.py#L582-L700)
 - [libs/agno/agno/models/anthropic/claude.py:823-950](file://libs/agno/agno/models/anthropic/claude.py#L823-L950)
 - [libs/agno/agno/models/anthropic/claude.py:952-1097](file://libs/agno/agno/models/anthropic/claude.py#L952-L1097)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/anthropic/claude.py:66-142](file://libs/agno/agno/models/anthropic/claude.py#L66-L142)
 - [libs/agno/agno/models/anthropic/claude.py:582-700](file://libs/agno/agno/models/anthropic/claude.py#L582-L700)
 - [libs/agno/agno/models/anthropic/claude.py:823-950](file://libs/agno/agno/models/anthropic/claude.py#L823-L950)
@@ -211,12 +225,12 @@ class AwsClaude {
 Claude <|-- AwsClaude
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/aws/claude.py:24-54](file://libs/agno/agno/models/aws/claude.py#L24-L54)
 - [libs/agno/agno/models/aws/claude.py:108-177](file://libs/agno/agno/models/aws/claude.py#L108-L177)
 - [libs/agno/agno/models/aws/claude.py:179-260](file://libs/agno/agno/models/aws/claude.py#L179-L260)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/aws/claude.py:24-54](file://libs/agno/agno/models/aws/claude.py#L24-L54)
 - [libs/agno/tests/unit/models/aws/test_claude_client.py:27-101](file://libs/agno/tests/unit/models/aws/test_claude_client.py#L27-L101)
 
@@ -242,12 +256,12 @@ class VertexClaude {
 Claude <|-- VertexClaude
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/vertexai/claude.py:19-47](file://libs/agno/agno/models/vertexai/claude.py#L19-L47)
 - [libs/agno/agno/models/vertexai/claude.py:65-107](file://libs/agno/agno/models/vertexai/claude.py#L65-L107)
 - [libs/agno/agno/models/vertexai/claude.py:109-191](file://libs/agno/agno/models/vertexai/claude.py#L109-L191)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/vertexai/claude.py:19-47](file://libs/agno/agno/models/vertexai/claude.py#L19-L47)
 
 ### 工具与消息格式化
@@ -269,11 +283,11 @@ G --> H
 H --> I["返回聊天消息与系统文本"]
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/utils/models/claude.py:265-366](file://libs/agno/agno/utils/models/claude.py#L265-L366)
 - [libs/agno/agno/utils/models/claude.py:368-415](file://libs/agno/agno/utils/models/claude.py#L368-L415)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/utils/models/claude.py:265-366](file://libs/agno/agno/utils/models/claude.py#L265-L366)
 - [libs/agno/agno/utils/models/claude.py:368-415](file://libs/agno/agno/utils/models/claude.py#L368-L415)
 
@@ -295,14 +309,40 @@ Agent-->>Helper : "run_completed"
 Helper-->>Model : "最终 Message(含思维)"
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/reasoning/anthropic.py:65-105](file://libs/agno/agno/reasoning/anthropic.py#L65-L105)
 - [libs/agno/agno/reasoning/anthropic.py:144-184](file://libs/agno/agno/reasoning/anthropic.py#L144-L184)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/reasoning/anthropic.py:13-26](file://libs/agno/agno/reasoning/anthropic.py#L13-L26)
 - [libs/agno/agno/reasoning/anthropic.py:65-105](file://libs/agno/agno/reasoning/anthropic.py#L65-L105)
 - [libs/agno/agno/reasoning/anthropic.py:144-184](file://libs/agno/agno/reasoning/anthropic.py#L144-L184)
+
+### 结构化输出能力检测系统
+**新增** Claude 模型引入了更稳健的结构化输出能力检测系统，替代了之前的脆弱 blocklist 方法。
+
+- **前缀检测系统**：使用 NON_STRUCTURED_OUTPUT_PREFIXES 常量定义所有不支持结构化输出的模型前缀，如 "claude-3-" 前缀下的所有 3.x 模型。
+- **别名检测系统**：使用 NON_STRUCTURED_OUTPUT_ALIASES 字典定义特定的不支持模型别名，如 claude-sonnet-4-20250514、claude-opus-4-20250514 等。
+- **默认支持策略**：所有新模型（包括未来模型）默认支持结构化输出，体现了 Anthropic 向通用结构化输出支持的趋势。
+- **检测逻辑**：通过 id in 别名集合 和 id.startswith(前缀) 的组合检查，确保检测的准确性。
+
+```mermaid
+flowchart TD
+A["模型ID检测"] --> B{"是否在别名集合中?"}
+B --> |是| C["返回False<br/>不支持结构化输出"]
+B --> |否| D{"是否以不支持前缀开头?"}
+D --> |是| E["返回False<br/>不支持结构化输出"]
+D --> |否| F["返回True<br/>支持结构化输出"]
+```
+
+**图表来源**
+- [libs/agno/agno/models/anthropic/claude.py:85-98](file://libs/agno/agno/models/anthropic/claude.py#L85-L98)
+- [libs/agno/agno/models/anthropic/claude.py:169-180](file://libs/agno/agno/models/anthropic/claude.py#L169-L180)
+
+**章节来源**
+- [libs/agno/agno/models/anthropic/claude.py:85-98](file://libs/agno/agno/models/anthropic/claude.py#L85-L98)
+- [libs/agno/agno/models/anthropic/claude.py:169-180](file://libs/agno/agno/models/anthropic/claude.py#L169-L180)
+- [libs/agno/tests/unit/models/anthropic/test_structured_output_capability.py:1-115](file://libs/agno/tests/unit/models/anthropic/test_structured_output_capability.py#L1-L115)
 
 ## 依赖分析
 - 组件耦合
@@ -327,14 +367,14 @@ Utils["消息/工具格式化"] --> SDK
 Reasoning["推理封装"] --> Claude
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/anthropic/claude.py:22-53](file://libs/agno/agno/models/anthropic/claude.py#L22-L53)
 - [libs/agno/agno/models/aws/claude.py:13-21](file://libs/agno/agno/models/aws/claude.py#L13-L21)
 - [libs/agno/agno/models/vertexai/claude.py:13-16](file://libs/agno/agno/models/vertexai/claude.py#L13-L16)
 - [libs/agno/agno/utils/models/claude.py:9-15](file://libs/agno/agno/utils/models/claude.py#L9-L15)
 - [libs/agno/agno/reasoning/anthropic.py:5-10](file://libs/agno/agno/reasoning/anthropic.py#L5-L10)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/anthropic/claude.py:22-53](file://libs/agno/agno/models/anthropic/claude.py#L22-L53)
 - [libs/agno/agno/models/aws/claude.py:13-21](file://libs/agno/agno/models/aws/claude.py#L13-L21)
 - [libs/agno/agno/models/vertexai/claude.py:13-16](file://libs/agno/agno/models/vertexai/claude.py#L13-L16)
@@ -356,8 +396,9 @@ Reasoning["推理封装"] --> Claude
   - 图片与文档尽量采用 URL 或已上传文件，减少 base64 编码带来的体积膨胀。
 - 并发与客户端复用
   - AWS/Vertex 子类在静态凭据场景可复用客户端实例，降低握手成本。
-
-[本节为通用指导，无需列出具体文件来源]
+- **更新** 结构化输出检测优化
+  - 新的 prefix-based 检测系统比之前的 blocklist 更高效，减少了字符串匹配的复杂度。
+  - 通过常量定义的前缀和别名集合，检测过程更加直接和快速。
 
 ## 故障排除指南
 - 环境变量与凭证
@@ -374,8 +415,11 @@ Reasoning["推理封装"] --> Claude
   - 图片/文档无法识别类型或文件不存在时，会记录错误并跳过该媒体。
 - 错误处理
   - 连接错误、速率限制、状态错误均被捕获并转换为统一的 Provider/RateLimit 异常，便于上层处理。
+- **更新** 结构化输出能力检测问题
+  - 如果新模型被错误地识别为不支持结构化输出，检查其模型 ID 是否符合新的 prefix-based 检测规则。
+  - 对于特殊模型，可以在 NON_STRUCTURED_OUTPUT_ALIASES 中添加别名，或在 NON_STRUCTURED_OUTPUT_PREFIXES 中添加前缀。
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/anthropic/claude.py:155-176](file://libs/agno/agno/models/anthropic/claude.py#L155-L176)
 - [libs/agno/agno/models/aws/claude.py:55-106](file://libs/agno/agno/models/aws/claude.py#L55-L106)
 - [libs/agno/agno/models/vertexai/claude.py:48-63](file://libs/agno/agno/models/vertexai/claude.py#L48-L63)
@@ -383,9 +427,7 @@ Reasoning["推理封装"] --> Claude
 - [libs/agno/tests/unit/utils/test_claude.py:62-66](file://libs/agno/tests/unit/utils/test_claude.py#L62-L66)
 
 ## 结论
-Agno Learn 的 Anthropic Claude 集成提供了高内聚、低耦合的适配层，覆盖多模态、工具调用、扩展思考与结构化输出等关键能力。通过 AWS/Vertex 子类，开发者可在不同托管环境下无缝切换。建议在生产中结合模型能力清单合理启用特性，配合流式输出与缓存策略优化性能与成本。
-
-[本节为总结性内容，无需列出具体文件来源]
+Agno Learn 的 Anthropic Claude 集成提供了高内聚、低耦合的适配层，覆盖多模态、工具调用、扩展思考与结构化输出等关键能力。通过 AWS/Vertex 子类，开发者可在不同托管环境下无缝切换。最新的结构化输出能力检测系统采用了更稳健的 prefix-based 检测机制，替代了之前的脆弱 blocklist 方法，提高了检测的准确性和维护性。建议在生产中结合模型能力清单合理启用特性，配合流式输出与缓存策略优化性能与成本。
 
 ## 附录
 
@@ -393,7 +435,20 @@ Agno Learn 的 Anthropic Claude 集成提供了高内聚、低耦合的适配层
 - 基础对话与学习测试：使用 Claude 进行用户画像提取与回忆验证。
 - 推理 Agent：启用扩展思考，观察思维块与最终答案的组合输出。
 - 工具调用：在 Claude 上使用严格模式工具定义，确保参数 Schema 严格校验。
+- **新增** 结构化输出示例：演示如何使用 Pydantic 模型定义结构化输出格式。
 
-章节来源
+**章节来源**
 - [cookbook/08_learning/06_quick_tests/04_claude_model.py:16-93](file://cookbook/08_learning/06_quick_tests/04_claude_model.py#L16-L93)
 - [libs/agno/agno/reasoning/anthropic.py:28-63](file://libs/agno/agno/reasoning/anthropic.py#L28-L63)
+- [cookbook/90_models/anthropic/structured_output.py:1-57](file://cookbook/90_models/anthropic/structured_output.py#L1-L57)
+- [cookbook/90_models/anthropic/structured_output_strict_tools.py:1-71](file://cookbook/90_models/anthropic/structured_output_strict_tools.py#L1-L71)
+
+### 结构化输出能力检测测试
+**新增** 测试用例展示了新的结构化输出能力检测系统的正确行为：
+
+- **支持结构化输出的模型**：claude-opus-4-1、claude-sonnet-4-5、claude-opus-4-5、claude-haiku-4-5、claude-opus-4-6、claude-sonnet-4-6 等新模型。
+- **不支持结构化输出的模型**：claude-3-opus、claude-3-sonnet、claude-3-haiku、claude-3-5-sonnet、claude-3-5-haiku、claude-sonnet-4-0、claude-opus-4-0 等旧模型。
+- **未来模型兼容性**：新模型如 claude-opus-4-7、claude-sonnet-5-0、claude-opus-5-0、claude-haiku-5-0 默认支持结构化输出。
+
+**章节来源**
+- [libs/agno/tests/unit/models/anthropic/test_structured_output_capability.py:1-115](file://libs/agno/tests/unit/models/anthropic/test_structured_output_capability.py#L1-L115)

@@ -11,7 +11,16 @@
 - [cookbook/90_models/google/gemini/gemini_3_pro.py](file://cookbook/90_models/google/gemini/gemini_3_pro.py)
 - [cookbook/91_tools/models/gemini_image_generation.py](file://cookbook/91_tools/models/gemini_image_generation.py)
 - [cookbook/gemini_3/README.md](file://cookbook/gemini_3/README.md)
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)
+- [libs/agno/tests/unit/tools/test_parallel_tools.py](file://libs/agno/tests/unit/tools/test_parallel_tools.py)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 新增 Parallel Web Systems 搜索 API 集成，支持 Vertex AI 上的实时网络数据检索
+- 添加 ToolParallelAiSearch 工具配置，支持 API 密钥管理和自定义配置
+- 增强搜索工具组合能力，支持与现有搜索工具共存
+- 新增 ParallelTools 工具集，提供完整的 Web 搜索和内容提取功能
 
 ## 目录
 1. [简介](#简介)
@@ -28,13 +37,16 @@
 ## 简介
 本文件面向 Agno Learn 项目中的 Google Gemini 模型集成，系统性梳理适配器设计与实现，覆盖 Gemini Pro、Gemini 3.x 等版本能力；详解 Google AI Studio 与 Vertex AI 双模式的认证与配置；阐述多模态输入（文本、图像、音频、视频、文件）、推理与思考、函数调用、结构化输出、流式响应等特性；并提供使用示例、高级功能与 Google Cloud 最佳实践。
 
+**更新** 本版本新增了对 Parallel Web Systems 搜索 API 的深度集成，支持在 Vertex AI 环境中进行实时网络数据检索，为 Gemini 模型提供强大的外部知识增强能力。
+
 ## 项目结构
 围绕 Google 模型的实现主要分布在以下模块：
-- 模型适配器：Gemini 文本模型适配，支持同步/异步、流式、函数调用、结构化输出、思考模式、搜索/检索/URL 上下文、文件搜索等
+- 模型适配器：Gemini 文本模型适配，支持同步/异步、流式、函数调用、结构化输出、思考模式、搜索/检索/URL 上下文、文件搜索、**Parallel Web Systems 搜索**等
 - 工具集：Gemini 图像/视频生成工具，支持 Vertex AI 模式下的视频生成
 - 嵌入：Gemini Embedder，支持 Vertex AI 与 AI Studio 模式
 - 推理：Gemini 思考模式识别与抽取
 - 工具函数：JSON Schema 到 Gemini Schema 的转换、消息格式化、媒体格式化等
+- **Parallel 工具集**：完整的 Web 搜索和内容提取工具，支持自然语言查询和传统关键词查询
 - 示例与测试：cookbook 中的 Gemini 3.x 使用示例与单元测试
 
 ```mermaid
@@ -46,6 +58,7 @@ M_Reasoning["Gemini 推理/思考<br/>libs/agno/agno/reasoning/gemini.py"]
 end
 subgraph "工具层"
 T_GeminiTools["Gemini 工具集<br/>libs/agno/agno/tools/models/gemini.py"]
+T_ParallelTools["Parallel 工具集<br/>libs/agno/agno/tools/parallel.py"]
 end
 subgraph "实用工具"
 U_GeminiUtils["Gemini 工具函数<br/>libs/agno/agno/utils/gemini.py"]
@@ -54,56 +67,60 @@ subgraph "示例与测试"
 C_Example["Gemini 3.x 示例<br/>cookbook/.../gemini_3_pro.py"]
 C_ImageGen["图像生成示例<br/>cookbook/.../gemini_image_generation.py"]
 T_Unit["单元测试<br/>libs/agno/tests/.../test_gemini.py"]
+T_ParallelUnit["Parallel 工具测试<br/>libs/agno/tests/.../test_parallel_tools.py"]
 Docs_Readme["使用说明<br/>cookbook/gemini_3/README.md"]
 end
 M_Gemini --> U_GeminiUtils
 T_GeminiTools --> U_GeminiUtils
 M_Embedder --> U_GeminiUtils
 M_Reasoning --> M_Gemini
+T_ParallelTools --> U_GeminiUtils
 C_Example --> M_Gemini
 C_ImageGen --> T_GeminiTools
 T_Unit --> M_Gemini
+T_ParallelUnit --> T_ParallelTools
 Docs_Readme --> M_Gemini
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 - [libs/agno/agno/tools/models/gemini.py](file://libs/agno/agno/tools/models/gemini.py)
 - [libs/agno/agno/knowledge/embedder/google.py](file://libs/agno/agno/knowledge/embedder/google.py)
 - [libs/agno/agno/reasoning/gemini.py](file://libs/agno/agno/reasoning/gemini.py)
 - [libs/agno/agno/utils/gemini.py](file://libs/agno/agno/utils/gemini.py)
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)
 - [cookbook/90_models/google/gemini/gemini_3_pro.py](file://cookbook/90_models/google/gemini/gemini_3_pro.py)
 - [cookbook/91_tools/models/gemini_image_generation.py](file://cookbook/91_tools/models/gemini_image_generation.py)
 - [libs/agno/tests/unit/models/google/test_gemini.py](file://libs/agno/tests/unit/models/google/test_gemini.py)
+- [libs/agno/tests/unit/tools/test_parallel_tools.py](file://libs/agno/tests/unit/tools/test_parallel_tools.py)
 - [cookbook/gemini_3/README.md](file://cookbook/gemini_3/README.md)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 - [libs/agno/agno/tools/models/gemini.py](file://libs/agno/agno/tools/models/gemini.py)
 - [libs/agno/agno/knowledge/embedder/google.py](file://libs/agno/agno/knowledge/embedder/google.py)
 - [libs/agno/agno/reasoning/gemini.py](file://libs/agno/agno/reasoning/gemini.py)
 - [libs/agno/agno/utils/gemini.py](file://libs/agno/agno/utils/gemini.py)
-- [cookbook/90_models/google/gemini/gemini_3_pro.py](file://cookbook/90_models/google/gemini/gemini_3_pro.py)
-- [cookbook/91_tools/models/gemini_image_generation.py](file://cookbook/91_tools/models/gemini_image_generation.py)
-- [libs/agno/tests/unit/models/google/test_gemini.py](file://libs/agno/tests/unit/models/google/test_gemini.py)
-- [cookbook/gemini_3/README.md](file://cookbook/gemini_3/README.md)
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)
 
 ## 核心组件
-- Gemini 文本模型适配器：统一的 Model 抽象，封装请求参数、消息格式化、函数调用、结构化输出、思考模式、搜索/检索/URL 上下文、文件搜索、计数令牌、流式与非流式调用、错误映射等
-- Gemini 工具集：图像生成、视频生成（Vertex AI）
-- Gemini 嵌入：支持 Vertex AI 与 AI Studio 模式，批量嵌入与用量统计
-- Gemini 推理/思考：识别思考型模型、抽取思考内容、支持流式思考
-- 工具函数：Schema 转换、消息/媒体格式化、响应模式准备
+- **Gemini 文本模型适配器**：统一的 Model 抽象，封装请求参数、消息格式化、函数调用、结构化输出、思考模式、搜索/检索/URL 上下文、文件搜索、**Parallel Web Systems 搜索**、计数令牌、流式与非流式调用、错误映射等
+- **Gemini 工具集**：图像生成、视频生成（Vertex AI）
+- **Gemini 嵌入**：支持 Vertex AI 与 AI Studio 模式，批量嵌入与用量统计
+- **Gemini 推理/思考**：识别思考型模型、抽取思考内容、支持流式思考
+- **Parallel 工具集**：完整的 Web 搜索和内容提取工具，支持自然语言查询、传统关键词查询、域名过滤、缓存策略等
+- **工具函数**：Schema 转换、消息/媒体格式化、响应模式准备
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 - [libs/agno/agno/tools/models/gemini.py](file://libs/agno/agno/tools/models/gemini.py)
 - [libs/agno/agno/knowledge/embedder/google.py](file://libs/agno/agno/knowledge/embedder/google.py)
 - [libs/agno/agno/reasoning/gemini.py](file://libs/agno/agno/reasoning/gemini.py)
 - [libs/agno/agno/utils/gemini.py](file://libs/agno/agno/utils/gemini.py)
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)
 
 ## 架构总览
-下图展示了从 Agent 到 Gemini API 的调用链路，以及内置工具（搜索、检索、URL 上下文、文件搜索）与外部函数工具的协同。
+下图展示了从 Agent 到 Gemini API 的调用链路，以及内置工具（搜索、检索、URL 上下文、文件搜索、**Parallel Web Systems 搜索**）与外部函数工具的协同。
 
 ```mermaid
 sequenceDiagram
@@ -111,28 +128,34 @@ participant Agent as "Agent"
 participant Model as "Gemini 模型适配器"
 participant Utils as "工具函数"
 participant Provider as "Google GenAI 客户端"
+participant Parallel as "Parallel Web Systems"
 Agent->>Model : "构造消息/工具/参数"
 Model->>Utils : "格式化消息/Schema/媒体"
 Model->>Provider : "generate_content(config, contents)"
 Provider-->>Model : "GenerateContentResponse"
 Model->>Utils : "解析响应/提取结果/工具调用"
+Model->>Parallel : "实时网络数据检索"
+Parallel-->>Model : "搜索结果"
 Model-->>Agent : "ModelResponse/流式片段"
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 - [libs/agno/agno/utils/gemini.py](file://libs/agno/agno/utils/gemini.py)
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)
 
 ## 详细组件分析
 
 ### 组件一：Gemini 文本模型适配器
-- 角色映射与消息格式化：支持 system/developer 提取为 system_instruction，assistant/tool 映射，函数调用与结果的 Part 组装，多模态媒体（图像/视频/文件）的 Part.from_* 构造
-- 请求参数构建：generation_config 合并、温度/采样参数、最大输出、停止序列、logprobs、惩罚项、种子、响应模态（文本/图像/音频）、语音配置、缓存内容、思考预算/包含思考/思考等级、工具选择模式（auto/none/any/validated）
-- 内置工具：Google 搜索、Grounding（已标记为遗留）、URL 上下文、Vertex AI 搜索、文件搜索工具
-- 结构化输出：对 Pydantic 模型进行 Schema 转换或原生支持，自动设置 response_mime_type 与 response_schema
-- 计数令牌：Vertex AI 支持完整计数（含 system_instruction 与 tools），AI Studio 使用混合策略（API 计算内容 + 本地估算 system/tools/schema）
-- 流式与非流式：generate_content / generate_content_stream，异步 aio 版本
-- 错误处理：捕获 ClientError/ServerError，映射为统一 ModelProviderError
+- **角色映射与消息格式化**：支持 system/developer 提取为 system_instruction，assistant/tool 映射，函数调用与结果的 Part 组装，多模态媒体（图像/视频/文件）的 Part.from_* 构造
+- **请求参数构建**：generation_config 合并、温度/采样参数、最大输出、停止序列、logprobs、惩罚项、种子、响应模态（文本/图像/音频）、语音配置、缓存内容、思考预算/包含思考/思考等级、工具选择模式（auto/none/any/validated）
+- **内置工具**：Google 搜索、Grounding（已标记为遗留）、URL 上下文、Vertex AI 搜索、**Parallel Web Systems 搜索**、文件搜索工具
+- **结构化输出**：对 Pydantic 模型进行 Schema 转换或原生支持，自动设置 response_mime_type 与 response_schema
+- **计数令牌**：Vertex AI 支持完整计数（含 system_instruction 与 tools），AI Studio 使用混合策略（API 计算内容 + 本地估算 system/tools/schema）
+- **流式与非流式**：generate_content / generate_content_stream，异步 aio 版本
+- **错误处理**：捕获 ClientError/ServerError，映射为统一 ModelProviderError
+
+**更新** 新增 Parallel Web Systems 搜索工具支持，通过 ToolParallelAiSearch 实现，支持 API 密钥配置和自定义配置参数。
 
 ```mermaid
 classDiagram
@@ -152,6 +175,16 @@ class Gemini {
 +url_context : bool
 +vertexai_search : bool
 +file_search_store_names
++parallel_search : bool
++parallel_api_key : str
++parallel_config : dict
++safety_settings
++search : bool
++grounding : bool
++url_context : bool
++vertexai_search : bool
++file_search_store_names
++file_search_metadata_filter
 +thinking_budget : int
 +include_thoughts : bool
 +thinking_level : string
@@ -166,18 +199,18 @@ class Gemini {
 }
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 - [libs/agno/agno/utils/gemini.py](file://libs/agno/agno/utils/gemini.py)
 
 ### 组件二：Gemini 工具集（图像/视频生成）
-- 模式选择：AI Studio（api_key）或 Vertex AI（vertexai + project/location）
-- 图像生成：调用 models.generate_images，返回 Image 媒体对象
-- 视频生成：仅 Vertex AI 模式，使用 models.generate_videos 并轮询 Operation 直到完成，返回 Video 媒体对象
-- 参数与校验：缺失必要环境变量时抛出错误
+- **模式选择**：AI Studio（api_key）或 Vertex AI（vertexai + project/location）
+- **图像生成**：调用 models.generate_images，返回 Image 媒体对象
+- **视频生成**：仅 Vertex AI 模式，使用 models.generate_videos 并轮询 Operation 直到完成，返回 Video 媒体对象
+- **参数与校验**：缺失必要环境变量时抛出错误
 
 ```mermaid
 sequenceDiagram
@@ -194,17 +227,17 @@ Client-->>Tools : "Operation(done)"
 Tools-->>Agent : "ToolResult(videos)"
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/tools/models/gemini.py](file://libs/agno/agno/tools/models/gemini.py)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/tools/models/gemini.py](file://libs/agno/agno/tools/models/gemini.py)
 
 ### 组件三：Gemini 嵌入（Embedder）
-- 模式：AI Studio（api_key）或 Vertex AI（vertexai + project/location）
-- 支持维度、任务类型、标题等配置
-- 同步/异步获取嵌入与用量统计
-- 批量嵌入（异步）回退策略
+- **模式**：AI Studio（api_key）或 Vertex AI（vertexai + project/location）
+- **支持维度、任务类型、标题等配置**
+- **同步/异步获取嵌入与用量统计**
+- **批量嵌入（异步）回退策略**
 
 ```mermaid
 flowchart TD
@@ -217,16 +250,16 @@ Call --> Parse["解析 embeddings/metadata"]
 Parse --> End(["结束"])
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/knowledge/embedder/google.py](file://libs/agno/agno/knowledge/embedder/google.py)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/knowledge/embedder/google.py](file://libs/agno/agno/knowledge/embedder/google.py)
 
 ### 组件四：Gemini 推理/思考
-- 模型识别：根据模型 ID 或思考参数判断是否为思考型模型
-- 推理抽取：从推理 Agent 的运行结果中提取 reasoning_content，封装为带<thinking>标签的消息
-- 流式推理：事件驱动地增量产出思考内容，最终汇总为完整消息
+- **模型识别**：根据模型 ID 或思考参数判断是否为思考型模型
+- **推理抽取**：从推理 Agent 的运行结果中提取 reasoning_content，封装为带<thinking>标签的消息
+- **流式推理**：事件驱动地增量产出思考内容，最终汇总为完整消息
 
 ```mermaid
 sequenceDiagram
@@ -247,17 +280,49 @@ Utils-->>Parent : "最终消息"
 end
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/reasoning/gemini.py](file://libs/agno/agno/reasoning/gemini.py)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/reasoning/gemini.py](file://libs/agno/agno/reasoning/gemini.py)
 
-### 组件五：工具函数（Schema/消息/媒体）
-- prepare_response_schema：将 Pydantic 模型转换为 Gemini Schema（处理自引用、additionalProperties、空定义等）
-- format_function_definitions：将工具定义转为 FunctionDeclaration 列表
-- format_image_for_message：支持 URL/本地路径/字节，生成 Part.from_bytes 参数
-- convert_schema：递归转换 JSON Schema 为 Gemini Schema，处理 $ref 循环引用、联合类型、可空等
+### 组件五：Parallel 工具集（Web 搜索与内容提取）
+- **API 集成**：通过 parallel-web SDK 连接到 Parallel Web Systems API
+- **搜索功能**：支持自然语言目标查询和传统关键词查询，可配置结果数量和字符限制
+- **内容提取**：从指定 URL 提取内容，支持相关文本片段和完整内容提取
+- **策略配置**：支持域名过滤、缓存策略、年龄限制等高级配置
+- **错误处理**：完整的异常处理和错误信息返回
+- **环境配置**：支持 PARALLEL_API_KEY 环境变量配置
+
+**更新** 新增完整的 Parallel 工具集，提供比 Gemini 内置搜索更强大和灵活的 Web 搜索能力。
+
+```mermaid
+flowchart TD
+Start(["Parallel 工具集"]) --> Config["API 密钥配置"]
+Config --> Search["Web 搜索"]
+Config --> Extract["内容提取"]
+Search --> NLQuery["自然语言查询"]
+Search --> KWQuery["关键词查询"]
+NLQuery --> Results["搜索结果"]
+KWQuery --> Results
+Results --> Format["格式化输出"]
+Extract --> URLList["URL 列表"]
+URLList --> Content["内容提取"]
+Content --> Format
+Format --> Return["返回 JSON"]
+```
+
+**图表来源**
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)
+
+**章节来源**
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)
+
+### 组件六：工具函数（Schema/消息/媒体）
+- **prepare_response_schema**：将 Pydantic 模型转换为 Gemini Schema（处理自引用、additionalProperties、空定义等）
+- **format_function_definitions**：将工具定义转为 FunctionDeclaration 列表
+- **format_image_for_message**：支持 URL/本地路径/字节，生成 Part.from_bytes 参数
+- **convert_schema**：递归转换 JSON Schema 为 Gemini Schema，处理 $ref 循环引用、联合类型、可空等
 
 ```mermaid
 flowchart TD
@@ -269,108 +334,151 @@ D --> E
 E --> F["prepare_response_schema 返回"]
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/utils/gemini.py](file://libs/agno/agno/utils/gemini.py)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/utils/gemini.py](file://libs/agno/agno/utils/gemini.py)
 
 ## 依赖分析
-- 模块内聚与耦合
+- **模块内聚与耦合**
   - Gemini 适配器高度依赖 utils 的消息/Schema/媒体格式化函数，形成清晰的分层
   - 工具集与适配器解耦，通过通用媒体对象交互
   - 嵌入模块与适配器解耦，独立负责向量表示
-- 外部依赖
+  - **Parallel 工具集**与 Gemini 适配器解耦，提供独立的 Web 搜索能力
+- **外部依赖**
   - google-genai 客户端（genai.Client），包含模型调用、计数、生成、操作轮询等
-  - 环境变量：GOOGLE_API_KEY、GOOGLE_GENAI_USE_VERTEXAI、GOOGLE_CLOUD_PROJECT、GOOGLE_CLOUD_LOCATION
+  - **parallel-web SDK**，用于 Parallel Web Systems API 调用
+  - 环境变量：GOOGLE_API_KEY、GOOGLE_GENAI_USE_VERTEXAI、GOOGLE_CLOUD_PROJECT、GOOGLE_CLOUD_LOCATION、**PARALLEL_API_KEY**
 
 ```mermaid
 graph LR
 Gemini["Gemini 适配器"] --> Utils["工具函数"]
 Gemini --> Provider["Google GenAI 客户端"]
+Gemini --> Parallel["Parallel Web Systems"]
 Tools["Gemini 工具集"] --> Provider
 Embedder["Gemini 嵌入"] --> Provider
 Reasoning["推理工具"] --> Gemini
+ParallelTools["Parallel 工具集"] --> ParallelSDK["parallel-web SDK"]
 ```
 
-图表来源
+**图表来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 - [libs/agno/agno/tools/models/gemini.py](file://libs/agno/agno/tools/models/gemini.py)
 - [libs/agno/agno/knowledge/embedder/google.py](file://libs/agno/agno/knowledge/embedder/google.py)
 - [libs/agno/agno/reasoning/gemini.py](file://libs/agno/agno/reasoning/gemini.py)
 - [libs/agno/agno/utils/gemini.py](file://libs/agno/agno/utils/gemini.py)
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 - [libs/agno/agno/tools/models/gemini.py](file://libs/agno/agno/tools/models/gemini.py)
 - [libs/agno/agno/knowledge/embedder/google.py](file://libs/agno/agno/knowledge/embedder/google.py)
 - [libs/agno/agno/reasoning/gemini.py](file://libs/agno/agno/reasoning/gemini.py)
 - [libs/agno/agno/utils/gemini.py](file://libs/agno/agno/utils/gemini.py)
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)
 
 ## 性能考虑
-- 计数令牌
+- **计数令牌**
   - Vertex AI：支持在 API 中传入 system_instruction 与 tools，获得准确 total_tokens
   - AI Studio：优先调用 API 获取内容令牌，再以本地估算 system_instruction、tools 与 response_schema 的令牌
-- 流式响应
+- **流式响应**
   - 使用 generate_content_stream 与 aio 版本，降低首字延迟，适合长回复场景
-- 缓存与提示词复用
+- **缓存与提示词复用**
   - Gemini 3.x 支持提示词缓存（prompt caching），可显著节省大文档场景的令牌成本
-- 媒体与文件
+- **媒体与文件**
   - 尽量使用 URI 方式传递远程资源，减少下载开销；本地文件建议预上传至云存储后以 URI 传入
-- 工具调用
+- **工具调用**
   - 合理设置 tool_choice 与函数参数 Schema，避免不必要的重试与引导
+- **Parallel Web Systems 搜索**
+  - **支持实时网络数据检索，可配置缓存策略和域名过滤，平衡准确性与时效性**
+  - **通过自定义配置实现更精细的搜索控制，如排除特定域名或限制结果来源**
 
 ## 故障排查指南
-- 环境变量未设置
+- **环境变量未设置**
   - GOOGLE_API_KEY 未设置：在 AI Studio 模式下会报错
   - GOOGLE_GENAI_USE_VERTEXAI=true 且未设置 GOOGLE_CLOUD_PROJECT/GOOGLE_CLOUD_LOCATION：Vertex AI 模式会报错
-- 模型不可用或拼写错误
+  - **PARALLEL_API_KEY 未设置：Parallel Web Systems 搜索需要有效的 API 密钥**
+- **模型不可用或拼写错误**
   - 检查模型 ID 是否正确（如 gemini-3-flash-preview、gemini-3.1-pro-preview 等）
-- 速率限制
+- **速率限制**
   - 429：等待或切换模型
-- 单元测试参考
+  - **Parallel API 速率限制：合理配置搜索频率，避免触发 API 限制**
+- **工具冲突**
+  - **Parallel Web Systems 搜索与 Google 搜索/Grounding 工具不能同时使用**
+  - **需要在 Vertex AI 环境中使用 Parallel 搜索**
+- **单元测试参考**
   - 客户端初始化：验证 vertexai 模式下 credentials 与 project/location 传参
   - 文件/URI/本地文件到 Part 的格式化逻辑
   - 空内容消息过滤与系统消息分离
+  - **Parallel 搜索工具配置：API 密钥、自定义配置、环境变量支持**
 
-章节来源
+**章节来源**
 - [libs/agno/tests/unit/models/google/test_gemini.py](file://libs/agno/tests/unit/models/google/test_gemini.py)
+- [libs/agno/tests/unit/tools/test_parallel_tools.py](file://libs/agno/tests/unit/tools/test_parallel_tools.py)
 - [cookbook/gemini_3/README.md](file://cookbook/gemini_3/README.md)
 
 ## 结论
-Agno Learn 的 Google Gemini 集成以 Gemini 适配器为核心，统一了多模态输入、函数调用、结构化输出、思考模式与多种检索/搜索能力；配合工具集与嵌入模块，形成从基础对话到复杂推理与生产级应用的完整能力谱系。通过明确的配置与错误处理、完善的流式与异步接口，开发者可以快速在不同场景下落地 Gemini 能力。
+Agno Learn 的 Google Gemini 集成以 Gemini 适配器为核心，统一了多模态输入、函数调用、结构化输出、思考模式与多种检索/搜索能力；配合工具集与嵌入模块，形成从基础对话到复杂推理与生产级应用的完整能力谱系。
+
+**更新** 新增的 Parallel Web Systems 搜索 API 集成为 Gemini 模型提供了强大的实时网络数据检索能力，通过 ToolParallelAiSearch 工具实现了与现有搜索工具的无缝集成，支持 Vertex AI 环境下的高性能网络数据访问。结合 ParallelTools 工具集，开发者可以构建更加智能和信息丰富的 AI 应用程序。
+
+通过明确的配置与错误处理、完善的流式与异步接口、以及对 Parallel Web Systems 的深度集成，开发者可以快速在不同场景下落地 Gemini 能力，并充分利用实时网络数据增强模型的性能。
 
 ## 附录
 
 ### Google AI Studio 与 Vertex AI 集成要点
-- AI Studio 模式
+- **AI Studio 模式**
   - 使用 GOOGLE_API_KEY
   - 支持 models.count_tokens 的内容令牌查询；system_instruction 与 tools 的令牌需本地估算
-- Vertex AI 模式
+- **Vertex AI 模式**
   - 设置 GOOGLE_GENAI_USE_VERTEXAI="true"，并提供 GOOGLE_CLOUD_PROJECT 与 GOOGLE_CLOUD_LOCATION
   - 可使用服务账号凭据（credentials），或默认 ADC
   - 支持更丰富的检索/搜索与文件搜索工具
+  - **支持 Parallel Web Systems 搜索 API 集成**
 
-章节来源
+**章节来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 - [libs/agno/agno/tools/models/gemini.py](file://libs/agno/agno/tools/models/gemini.py)
 - [libs/agno/agno/knowledge/embedder/google.py](file://libs/agno/agno/knowledge/embedder/google.py)
 
 ### 配置选项速览（Gemini 适配器）
-- 基础参数：temperature、top_p、top_k、max_output_tokens、stop_sequences、seed
-- 安全与生成：safety_settings、generation_config、generative_model_kwargs
-- 多模态与输出：response_modalities、speech_config、cached_content
-- 思考模式：thinking_budget、include_thoughts、thinking_level
-- 工具与检索：search、grounding、url_context、vertexai_search、file_search_store_names、file_search_metadata_filter
-- 认证与客户端：api_key、vertexai、project_id、location、client_params、credentials
+- **基础参数**：temperature、top_p、top_k、max_output_tokens、stop_sequences、seed
+- **安全与生成**：safety_settings、generation_config、generative_model_kwargs
+- **多模态与输出**：response_modalities、speech_config、cached_content
+- **思考模式**：thinking_budget、include_thoughts、thinking_level
+- **工具与检索**：search、grounding、url_context、vertexai_search、**parallel_search**、**parallel_api_key**、**parallel_config**、file_search_store_names、file_search_metadata_filter
+- **认证与客户端**：api_key、vertexai、project_id、location、client_params、credentials
 
-章节来源
+**更新** 新增 Parallel Web Systems 搜索配置选项，包括 parallel_search 开关、parallel_api_key API 密钥和 parallel_config 自定义配置。
+
+**章节来源**
 - [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
 
 ### 使用示例索引
-- Gemini 3.x 示例（异步、工具调用、搜索）
+- **Gemini 3.x 示例**（异步、工具调用、搜索）
   - [cookbook/90_models/google/gemini/gemini_3_pro.py](file://cookbook/90_models/google/gemini/gemini_3_pro.py)
-- 图像生成工具示例
+- **图像生成工具示例**
   - [cookbook/91_tools/models/gemini_image_generation.py](file://cookbook/91_tools/models/gemini_image_generation.py)
-- Gemini 3 快速上手与功能清单
+- **Gemini 3 快速上手与功能清单**
   - [cookbook/gemini_3/README.md](file://cookbook/gemini_3/README.md)
+- **Parallel Web Systems 搜索示例**
+  - **通过 Gemini 适配器的 parallel_search 配置启用**
+  - **通过 ParallelTools 工具集进行独立的 Web 搜索和内容提取**
+
+### Parallel Web Systems 搜索配置指南
+- **API 密钥配置**
+  - 支持通过构造函数参数、环境变量（PARALLEL_API_KEY）或 GCP Marketplace 订阅
+- **自定义配置**
+  - 支持 source_policy 域名过滤策略
+  - 支持 fetch_policy 缓存和年龄限制策略
+  - 支持 excerpts 和 full_content 结果格式控制
+- **使用场景**
+  - 实时新闻聚合
+  - 学术论文检索
+  - 企业知识库增强
+  - 市场情报分析
+
+**章节来源**
+- [libs/agno/agno/models/google/gemini.py](file://libs/agno/agno/models/google/gemini.py)
+- [libs/agno/agno/tools/parallel.py](file://libs/agno/agno/tools/parallel.py)

@@ -1,0 +1,37 @@
+# imagen_tool.py — 实现原理分析
+
+> 源文件：`cookbook/90_models/google/gemini/imagen_tool.py`
+
+## 概述
+
+**注意**：主模型为 **`OpenAIChat(id="gpt-4o")`**，**非** `Gemini` 类；工具为 **`GeminiTools()`**，由 GPT-4o 调度以调用 Gemini 生图 API，`save_base64_data` 落盘。
+
+**核心配置一览：**
+
+| 配置项 | 值 | 说明 |
+|--------|------|------|
+| `model` | `OpenAIChat(id="gpt-4o")` | Chat Completions |
+| `tools` | `[GeminiTools()]` | 封装 Imagen/Gemini 生图 |
+
+## System Prompt 组装
+
+走 **OpenAI** 适配器默认 system，非 `Gemini.get_request_params`；本节不适用「Gemini generate_content」作为主路径。
+
+## 完整 API 请求
+
+外层：`chat.completions.create`（OpenAI）；工具执行内部再调 Google GenAI。
+
+## Mermaid 流程图
+
+```mermaid
+flowchart TD
+    A["GPT-4o Agent"] --> B["【关键】GeminiTools 生图"]
+    B --> C["save_base64_data"]
+```
+
+## 关键源码文件索引
+
+| 文件 | 关键函数/类 | 作用 |
+|------|------------|------|
+| `agno/tools/models/gemini.py` | `GeminiTools` | 生图工具 |
+| `agno/models/openai/chat.py` | `invoke()` | 外层 LLM |

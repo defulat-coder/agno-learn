@@ -1,0 +1,73 @@
+# background_poll.py — 实现原理分析
+
+> 源文件：`cookbook/04_workflows/06_advanced_concepts/background_execution/background_poll.py`
+
+## 概述
+
+本示例展示 Agno 的 **`arun(..., background=True)` + `get_run(run_id)` 轮询** 机制：异步提交后台工作流后立即返回带 `run_id` 的响应，再通过周期性 `get_run` 直到 `has_completed()`，用于长任务不阻塞调用方。
+
+**核心配置一览：**
+
+| 配置项 | 值 | 说明 |
+|--------|------|------|
+| `content_creation_workflow.db` | `SqliteDb(db_file="tmp/workflow.db", ...)` | 会话持久化 |
+| `steps` | `research_step`（Team）, `content_planning_step`（Agent） | 两步 |
+| `research_team` | `Team(members=[...], instructions=...)` | 多 Agent 协作 |
+| `arun` | `background=True` | `L88-91` |
+
+## 架构分层
+
+```
+main() ──> arun(background=True) ──> 返回 run_id
+              │
+              └── 循环 get_run(run_id) ──> has_completed()
+```
+
+## 核心组件解析
+
+### 后台运行
+
+`Workflow.arun` 在 `background=True` 时由框架异步调度执行（实现见 `workflow.py` 中 async 路径）；`get_run` 从 `db` 拉取运行状态。
+
+### 运行机制与因果链
+
+1. **数据路径**：`input` 字符串 → 后台任务 → 轮询读库 → `pprint_run_response`。
+2. **状态与副作用**：`tmp/workflow.db` 写入；需并发安全时注意 SQLite 限制。
+3. **关键分支**：`result is None` 时继续等待；超时退出（`L103-116`）。
+
+## System Prompt 组装
+
+- **Team**：`research_team.instructions` = `"Research tech topics from Hackernews and the web"`（`L49-53`）。
+- **content_planner**：`instructions` 为列表（`L40-43`）。
+- 成员 Agent 使用 `role` 与默认 system 拼装。
+
+### 还原后的完整 System 文本（content_planner 指令列表拼接）
+
+以 `get_system_message()` 实际拼接为准；字面量包含：
+
+```text
+Plan a content schedule over 4 weeks for the provided topic and research content
+Ensure that I have posts for 3 posts per week
+```
+
+## 完整 API 请求
+
+各 `OpenAIChat` 子调用为 Chat Completions；后台模式不改变单次 Agent 请求形态。
+
+## Mermaid 流程图
+
+```mermaid
+flowchart TD
+    A["arun background=True"] --> B["返回 run_id"]
+    B --> C["【关键】get_run 轮询"]
+    C --> D{"has_completed?"}
+    D -->|否| C
+    D -->|是| E["pprint_run_response"]
+```
+
+## 关键源码文件索引
+
+| 文件 | 关键函数/类 | 作用 |
+|------|------------|------|
+| `agno/workflow/workflow.py` | `arun`；`get_run` | 后台与查询 |
+| `agno/db/sqlite.py` | `SqliteDb` | 会话存储 |

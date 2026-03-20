@@ -14,7 +14,14 @@
 - [cookbook/06_storage/postgres/async_postgres/async_postgres_for_agent.py](file://cookbook/06_storage/postgres/async_postgres/async_postgres_for_agent.py)
 - [cookbook/05_agent_os/dbs/postgres.py](file://cookbook/05_agent_os/dbs/postgres.py)
 - [libs/agno_infra/agno/docker/app/postgres/postgres.py](file://libs/agno_infra/agno/docker/app/postgres/postgres.py)
+- [libs/agno/tests/unit/db/test_async_postgres.py](file://libs/agno/tests/unit/db/test_async_postgres.py)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 更新了 AsyncPostgresDb 实现的缺失表处理逻辑
+- 修正了表不存在时的返回行为，从记录 ERROR 消息改为返回 None
+- 增强了错误处理的一致性和可预测性
 
 ## 目录
 1. [简介](#简介)
@@ -33,6 +40,8 @@
 Agno Learn 项目中的 PostgreSQL 存储实现是一个企业级的数据库解决方案，专为 AI 代理系统设计。该实现提供了完整的同步和异步数据库操作支持，包括会话管理、知识存储、指标收集、跟踪和跨度记录等功能。
 
 该存储实现基于 SQLAlchemy ORM，支持现代 PostgreSQL 特性，包括 JSONB 数据类型、全文搜索和高级索引策略。系统还提供了完整的数据库迁移框架，支持版本升级和降级操作。
+
+**更新** 修复了 AsyncPostgresDb 实现中缺失表处理的问题，确保在表不存在时正确返回 None 而不是记录 ERROR 消息。
 
 ## 项目结构
 
@@ -469,7 +478,7 @@ stateDiagram-v2
 
 系统当前支持的数据库版本：
 
-| 版本号 | 特性 | 发布日期 |
+| 版本号 | 特性 | 发售日期 |
 |-------|------|----------|
 | 2.0.0 | 初始版本 | 2024 |
 | 2.3.0 | 新增组件管理 | 2024 |
@@ -478,6 +487,37 @@ stateDiagram-v2
 **章节来源**
 - [libs/agno/agno/db/migrations/manager.py:14-26](file://libs/agno/agno/db/migrations/manager.py#L14-L26)
 - [libs/agno/migrations/migrate_postgres.py:7-25](file://libs/agno/migrations/migrate_postgres.py#L7-L25)
+
+### 缺失表处理改进
+
+**更新** AsyncPostgresDb 实现已修复缺失表处理逻辑，确保在表不存在时正确返回 None：
+
+#### 改进的错误处理机制
+
+```mermaid
+flowchart TD
+A[数据库操作请求] --> B{检查表是否存在}
+B --> |表存在| C[执行数据库操作]
+B --> |表不存在| D{create_table_if_not_found 参数}
+D --> |False| E[返回 None]
+D --> |True| F[创建表并执行操作]
+C --> G[返回操作结果]
+E --> H[不记录 ERROR 日志]
+F --> G
+```
+
+**图表来源**
+- [libs/agno/agno/db/postgres/async_postgres.py:421-466](file://libs/agno/agno/db/postgres/async_postgres.py#L421-L466)
+
+#### 具体改进点
+
+1. **表不存在时的行为**：当 `_get_or_create_table` 方法检测到表不存在且 `create_table_if_not_found=False` 时，直接返回 `None` 而不是记录 ERROR 消息
+2. **一致性处理**：所有涉及表操作的方法都遵循相同的返回模式，确保调用方能够正确处理表不存在的情况
+3. **日志记录优化**：避免在正常业务流程中产生不必要的 ERROR 日志，提高日志系统的准确性
+
+**章节来源**
+- [libs/agno/agno/db/postgres/async_postgres.py:421-466](file://libs/agno/agno/db/postgres/async_postgres.py#L421-L466)
+- [libs/agno/tests/unit/db/test_async_postgres.py:27-44](file://libs/agno/tests/unit/db/test_async_postgres.py#L27-L44)
 
 ## 依赖关系分析
 
@@ -647,6 +687,22 @@ N --> O
 - 增加重试机制
 - 加强错误处理
 
+#### 缺失表问题
+
+**问题症状**：表不存在导致操作失败
+
+**诊断步骤**：
+1. 检查表是否已创建
+2. 验证 `create_table_if_not_found` 参数设置
+3. 确认数据库权限
+4. 检查 schema 配置
+
+**解决方案**：
+- 确保在首次使用时启用表自动创建
+- 检查数据库迁移是否完成
+- 验证用户权限是否足够
+- 确认 schema 名称正确
+
 **章节来源**
 - [libs/agno/agno/db/postgres/postgres.py:694-781](file://libs/agno/agno/db/postgres/postgres.py#L694-L781)
 - [libs/agno/agno/db/postgres/async_postgres.py:536-718](file://libs/agno/agno/db/postgres/async_postgres.py#L536-L718)
@@ -677,6 +733,15 @@ Agno Learn 项目的 PostgreSQL 存储实现是一个功能完整、性能优异
 3. **数据迁移**：定期执行数据库迁移，保持 schema 最新
 4. **性能监控**：建立完善的性能监控体系
 5. **安全配置**：实施严格的访问控制和数据加密
+
+### 改进总结
+
+**更新** 本次更新重点改进了 AsyncPostgresDb 的错误处理机制，特别是在处理缺失表时的行为更加合理和一致。新的实现确保了：
+
+- 表不存在时返回 None 而非记录 ERROR 消息
+- 所有表操作方法遵循统一的返回模式
+- 提高了系统的可预测性和易用性
+- 减少了不必要的日志噪声
 
 该存储实现为企业级 AI 应用提供了可靠的数据持久化基础，能够支持从原型开发到生产部署的各种场景需求。
 
@@ -762,3 +827,21 @@ async def run_agent():
 - 监控磁盘空间使用
 - 备份策略执行
 - 性能基准测试
+
+### 缺失表处理最佳实践
+
+**更新** 针对缺失表处理的新行为：
+
+1. **自动创建优先**：在首次使用时启用 `create_table_if_not_found=True`
+2. **显式检查**：在关键操作前检查表是否存在
+3. **优雅降级**：当表不存在时，应用程序应能优雅处理返回的 None
+4. **日志记录**：仅在需要时记录相关信息，避免过度日志
+
+```python
+# 示例：检查表是否存在并处理缺失情况
+table = await async_db._get_table("sessions", create_table_if_not_found=False)
+if table is None:
+    # 处理表不存在的情况
+    logger.info("Sessions table not found, some operations may be limited")
+    return None
+```

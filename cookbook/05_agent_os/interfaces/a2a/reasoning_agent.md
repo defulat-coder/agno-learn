@@ -1,0 +1,50 @@
+# reasoning_agent.py — 实现原理分析
+
+> 源文件：`cookbook/05_agent_os/interfaces/a2a/reasoning_agent.py`
+
+## 概述
+
+**`OpenAIChat(id="o4-mini")` + `WebSearchTools`**；**长 `description`**；**`add_datetime_to_context` / `add_history_to_context` / `add_location_to_context`**，**`timezone_identifier="Etc/UTC"`**；**`a2a_interface=True`**，端口 **7777**。
+
+**核心配置一览：**
+
+| 配置项 | 值 | 说明 |
+|--------|------|------|
+| `id` | `reasoning_agent` | A2A 路由 id |
+| `instructions` | `"You are a helpful AI assistant with reasoning capabilities."` | 字面量 |
+
+## System Prompt 组装
+
+### 还原后的完整 System 文本（核心字面量 + 附加）
+
+**description（源 L21 单行）：**
+
+```text
+An advanced AI assistant with deep reasoning and analytical capabilities, enhanced with real-time web search to deliver thorough, well-thought-out responses with contextual awareness
+```
+
+**instructions：**
+
+```text
+You are a helpful AI assistant with reasoning capabilities.
+```
+
+并叠加 markdown、时间、位置、工具说明（运行时）。
+
+## 完整 API 请求
+
+`OpenAIChat.invoke` → `chat.completions.create`（以 `o4-mini` 能力为准）。
+
+## Mermaid 流程图
+
+```mermaid
+flowchart TD
+    A["A2A"] --> B["【关键】o4-mini + WebSearch"]
+```
+
+## 关键源码文件索引
+
+| 文件 | 作用 |
+|------|------|
+| `agno/models/openai/chat.py` | `invoke` |
+| `agno/os` | `a2a_interface` |

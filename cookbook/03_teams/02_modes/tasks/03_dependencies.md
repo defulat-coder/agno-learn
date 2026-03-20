@@ -1,0 +1,45 @@
+# 03_dependencies.py — 实现原理分析
+
+> 源文件：`cookbook/03_teams/02_modes/tasks/03_dependencies.py`
+
+## 概述
+
+**TeamMode.tasks** 带 **任务依赖链**：采集 → 分析 → 报告，队长指令要求创建任务时使用 dependency 字段保证顺序（Data → Analyst → Report Writer）。
+
+**核心配置一览：**
+
+| 配置项 | 值 |
+|--------|-----|
+| `mode` | `TeamMode.tasks` |
+| `max_iterations` | `10` |
+
+## System Prompt 组装
+
+```text
+You lead a research pipeline team.
+Create tasks with dependencies to enforce execution order:
+1. Data Collection (no dependencies) -- assign to Data Collector
+2. Analysis (depends on Data Collection) -- assign to Analyst
+3. Report Writing (depends on Analysis) -- assign to Report Writer
+Use the dependency field when creating tasks to ensure correct ordering.
+Provide the final report as your response.
+
+Use markdown to format your answers.
+```
+
+## Mermaid 流程图
+
+```mermaid
+flowchart LR
+    D["Data"] --> A["Analysis"]
+    A --> R["Report"]
+    D --> K["【关键】dependency 约束顺序"]
+```
+
+- **【关键】dependency 约束顺序**：相对纯并行 tasks 的差异点。
+
+## 关键源码文件索引
+
+| 文件 | 作用 |
+|------|------|
+| `agno/team/` | 任务 DAG 执行 |
